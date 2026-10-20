@@ -133,7 +133,7 @@ export function ensureCategoryRules(db) {
   const formatByKey = (key) => formats.find((item) => item.key === key)
 
   for (const band of db.ageBands) {
-    if (!Array.isArray(band.formatKeys) || !band.formatKeys.length) {
+    if (!Array.isArray(band.formatKeys)) {
       band.formatKeys = formatKeysForBand(band)
       changed = true
     }
@@ -149,7 +149,7 @@ export function ensureCategoryRules(db) {
     changed = true
   }
   for (const type of db.participantTypes) {
-    if (!Array.isArray(type.formatKeys) || !type.formatKeys.length) {
+    if (!Array.isArray(type.formatKeys)) {
       type.formatKeys = formatKeysForType(type)
       changed = true
     }
@@ -217,6 +217,15 @@ export function ensureCategoryRules(db) {
       format: couple,
       ageBandId: band.id,
       price: 1000,
+    })
+  }
+  for (const band of db.ageBands.filter((item) => item.active !== false)) {
+    ensureCategory({
+      id: `cl-group-age-${band.id}`,
+      name: `${band.name} · Group`,
+      format: group,
+      ageBandId: band.id,
+      price: 1500,
     })
   }
   for (const type of db.participantTypes.filter((item) => item.active !== false && (item.formatKeys || []).includes('group'))) {
@@ -292,16 +301,24 @@ export function formatKeyToPlayerType(formatKey) {
   return 'single'
 }
 
+function narrowestBand(bands) {
+  return [...bands].sort(
+    (a, b) => (Number(a.maxAge) - Number(a.minAge)) - (Number(b.maxAge) - Number(b.minAge)) || Number(a.minAge) - Number(b.minAge),
+  )[0] || null
+}
+
 export function findAgeBand(ageBands, age, formatKey) {
-  if (age === null || age === undefined || formatKey === 'group') return null
+  if (age === null || age === undefined || !Number.isFinite(Number(age))) return null
+  const ageNum = Number(age)
   const matches = (ageBands || []).filter(
-    (band) => band.active !== false && age >= band.minAge && age <= band.maxAge,
+    (band) => band.active !== false && ageNum >= Number(band.minAge) && ageNum <= Number(band.maxAge),
   )
   if (formatKey) {
     const scoped = matches.filter((band) => (band.formatKeys || []).includes(formatKey))
-    if (scoped.length) return scoped[0]
+    if (scoped.length) return narrowestBand(scoped)
+    if (formatKey === 'group') return narrowestBand(matches)
   }
-  return matches.find((band) => !(band.formatKeys || []).length) || null
+  return narrowestBand(matches.filter((band) => !(band.formatKeys || []).length)) || narrowestBand(matches)
 }
 
 export function typeAllowsFormat(type, formatKey) {
@@ -318,6 +335,11 @@ export function findClassification(db, { age, participantTypeId, formatKey }) {
     (item) => item.active !== false && item.kind === 'category' && item.formatId === format.id,
   )
   if (formatKey === 'group') {
+    const band = findAgeBand(db.ageBands, age, 'group')
+    if (band) {
+      const byAge = categories.find((item) => item.ageBandId === band.id)
+      if (byAge) return byAge
+    }
     if (!participantTypeId) return null
     return (
       categories.find((item) => item.participantTypeId === participantTypeId) ||

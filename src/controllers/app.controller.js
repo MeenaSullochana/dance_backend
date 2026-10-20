@@ -92,6 +92,9 @@ export function createAppController(store) {
       const comment = String(req.body?.comment || '').slice(0, 500)
       const player = store.read().players.find((item) => item.id === playerId)
       if (!player) return fail(res, 404, 'Player not found')
+      if (store.read().settings?.livePlayerId !== playerId) {
+        return fail(res, 403, 'Marks are open only while this participant is live')
+      }
       const checked = validateMarks(store.read(), req.body?.criteria, player.classificationId)
       if (checked.error) return fail(res, 400, checked.error)
       const { criteria, total, maxTotal } = checked

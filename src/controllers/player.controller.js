@@ -1,5 +1,5 @@
 import { newId } from '../data/store.js'
-import { buildPlayerPayload } from '../services/player.service.js'
+import { assignArrival, buildPlayerPayload } from '../services/player.service.js'
 import { fail, sendState } from '../utils/response.js'
 
 export function createPlayerController(store) {
@@ -11,14 +11,29 @@ export function createPlayerController(store) {
       const userId = req.auth.user.id
       await store.update((db) => {
         const chestNo = Math.max(100, ...db.players.map((player) => player.chestNo || 0)) + 1
-        db.players.push({ id: newId('p'), chestNo, winner: false, ...built.player })
+        db.players.push({
+          id: newId('p'),
+          chestNo,
+          winner: false,
+          arrived: false,
+          arrivalNo: null,
+          ...built.player,
+          source: 'spot',
+        })
       })
       sendState(res, store, userId)
     },
 
     async update(req, res) {
+      const current = store.read().players.find((player) => player.id === req.params.id)
+      if (!current) return fail(res, 404, 'Player not found')
       const built = buildPlayerPayload(store.read(), req.body)
       if (built.error) return fail(res, 400, built.error)
+      const moved = Boolean(current.arrivalNo) && current.classificationId !== built.player.classificationId && Boolean(built.player.classificationId)
+      if (moved) {
+        const preview = assignArrival(store.read(), { ...current, ...built.player, arrivalNo: null, reissue: true })
+        if (preview.error) return fail(res, 400, preview.error)
+      }
 
       const userId = req.auth.user.id
       let found = false
@@ -26,8 +41,19 @@ export function createPlayerController(store) {
         db.players = db.players.map((player) => {
           if (player.id !== req.params.id) return player
           found = true
-          const moved = player.classificationId !== built.player.classificationId
-          return { ...player, ...built.player, winner: moved ? false : player.winner }
+          const categoryChanged = player.classificationId !== built.player.classificationId
+          let arrivalNo = player.arrivalNo || null
+          if (categoryChanged && arrivalNo && built.player.classificationId) {
+            arrivalNo = assignArrival(db, { ...player, ...built.player, arrivalNo: null, reissue: true }).arrivalNo || arrivalNo
+          }
+          return {
+            ...player,
+            ...built.player,
+            chestNo: player.chestNo,
+            arrivalNo,
+            arrived: Boolean(player.arrived),
+            winner: categoryChanged ? false : player.winner,
+          }
         })
       })
       if (!found) return fail(res, 404, 'Player not found')
@@ -62,6 +88,28 @@ export function createPlayerController(store) {
           }
           return item
         })
+      })
+      sendState(res, store, userId)
+    },
+
+    async setArrived(req, res) {
+      const current = store.read().players.find((player) => player.id === req.params.id)
+      if (!current) return fail(res, 404, 'Player not found')
+      const userId = req.auth.user.id
+      const arrived = req.body?.arrived === undefined ? !current.arrived : Boolean(req.body.arrived)
+      if (!arrived) {
+        await store.update((db) => {
+          db.players = db.players.map((player) => (player.id === current.id ? { ...player, arrived: false } : player))
+        })
+        return sendState(res, store, userId)
+      }
+      const assigned = assignArrival(store.read(), current)
+      if (assigned.error) return fail(res, 400, assigned.error)
+      await store.update((db) => {
+        const fresh = assignArrival(db, db.players.find((player) => player.id === current.id) || current)
+        db.players = db.players.map((player) =>
+          player.id === current.id ? { ...player, arrived: true, arrivalNo: fresh.arrivalNo || assigned.arrivalNo } : player,
+        )
       })
       sendState(res, store, userId)
     },

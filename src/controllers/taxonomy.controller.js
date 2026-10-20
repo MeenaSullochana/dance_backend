@@ -10,6 +10,74 @@ function cleanFormatKeys(value, fallback) {
   return keys.length ? keys : fallback
 }
 
+async function assignCategoryParameters(store, req, res, classificationId) {
+  const ids = [...new Set(req.body.criterionIds.map((id) => String(id || '').trim()).filter(Boolean))]
+  if (!store.read().classifications.some((item) => item.id === classificationId)) {
+    return fail(res, 404, 'Category not found')
+  }
+  const catalog = store.read().markCriteria || []
+  const selected = []
+  for (const id of ids) {
+    const criterion = catalog.find((item) => item.id === id && item.active !== false)
+    if (!criterion) return fail(res, 400, 'Choose mark categories from the list')
+    selected.push(criterion)
+  }
+  const userId = req.auth.user.id
+  await store.update((db) => {
+    const existing = (db.categoryParameters || []).filter((item) => item.classificationId === classificationId)
+    const next = selected.map((criterion, index) => {
+      const match = existing.find((item) => item.key === criterion.key)
+      return {
+        id: match?.id || newId('cp'),
+        classificationId,
+        name: criterion.name,
+        key: criterion.key,
+        maxMarks: Number(criterion.maxMarks),
+        sortOrder: index + 1,
+        active: true,
+      }
+    })
+    db.categoryParameters = [
+      ...(db.categoryParameters || []).filter((item) => item.classificationId !== classificationId),
+      ...next,
+    ]
+    const classification = db.classifications.find((item) => item.id === classificationId)
+    if (classification) classification.parametersSeeded = true
+  })
+  sendState(res, store, userId)
+}
+
+function dropUnmatchedCategories(db, { ageBandId, participantTypeId, formatKeys }) {
+  const allowed = new Set(formatKeys || [])
+  const removed = new Set()
+  db.classifications = db.classifications.filter((item) => {
+    if (item.kind !== 'category') return true
+    if (ageBandId && item.ageBandId !== ageBandId) return true
+    if (participantTypeId && item.participantTypeId !== participantTypeId) return true
+    const key = db.formats.find((entry) => entry.id === item.formatId)?.key
+    if (allowed.has(key)) return true
+    removed.add(item.id)
+    return false
+  })
+  if (!removed.size) return
+  db.categoryParameters = (db.categoryParameters || []).filter((item) => !removed.has(item.classificationId))
+  db.players = db.players.map((player) =>
+    removed.has(player.classificationId) ? { ...player, classificationId: null, winner: false } : player,
+  )
+}
+
+function renameLinkedCategories(db, { ageBandId, participantTypeId, previousName, nextName }) {
+  if (!previousName || previousName === nextName) return
+  db.classifications = db.classifications.map((item) => {
+    if (ageBandId && item.ageBandId !== ageBandId) return item
+    if (participantTypeId && item.participantTypeId !== participantTypeId) return item
+    const formatName = db.formats.find((entry) => entry.id === item.formatId)?.name || ''
+    const auto = `${previousName} · ${formatName}`
+    if (item.name !== auto && item.name !== previousName) return item
+    return { ...item, name: `${nextName} · ${formatName}`.replace(/\s·\s$/, '') }
+  })
+}
+
 function cleanPrice(value) {
   const price = Number(value)
   if (!Number.isFinite(price) || price < 0 || price > 1000000) return null
@@ -48,7 +116,8 @@ export function createTaxonomyController(store) {
         db.ageBands = db.ageBands.map((band) => {
           if (band.id !== req.params.id) return band
           found = true
-          return {
+          const previousName = band.name
+          const next = {
             ...band,
             name,
             minAge,
@@ -56,7 +125,11 @@ export function createTaxonomyController(store) {
             formatKeys: req.body?.formatKeys === undefined ? band.formatKeys || ['solo'] : cleanFormatKeys(req.body.formatKeys, band.formatKeys || ['solo']),
             active: req.body?.active === undefined ? band.active : Boolean(req.body.active),
           }
+          renameLinkedCategories(db, { ageBandId: band.id, previousName, nextName: name })
+          return next
         })
+        const saved = db.ageBands.find((band) => band.id === req.params.id)
+        if (saved) dropUnmatchedCategories(db, { ageBandId: saved.id, formatKeys: saved.formatKeys })
       })
       if (!found) return fail(res, 404, 'Age band not found')
       sendState(res, store, userId)
@@ -97,6 +170,8 @@ export function createTaxonomyController(store) {
         db.participantTypes = db.participantTypes.map((type) => {
           if (type.id !== req.params.id) return type
           found = true
+          const previousName = type.name
+          renameLinkedCategories(db, { participantTypeId: type.id, previousName, nextName: name })
           return {
             ...type,
             name,
@@ -104,6 +179,8 @@ export function createTaxonomyController(store) {
             active: req.body?.active === undefined ? type.active : Boolean(req.body.active),
           }
         })
+        const saved = db.participantTypes.find((type) => type.id === req.params.id)
+        if (saved) dropUnmatchedCategories(db, { participantTypeId: saved.id, formatKeys: saved.formatKeys })
       })
       if (!found) return fail(res, 404, 'Participant type not found')
       sendState(res, store, userId)
@@ -236,6 +313,9 @@ export function createTaxonomyController(store) {
             participantTypeId: req.body?.participantTypeId === undefined ? item.participantTypeId : req.body.participantTypeId || null,
             formatId: req.body?.formatId || item.formatId,
             price: req.body?.price === undefined ? item.price ?? 0 : cleanPrice(req.body.price),
+            prefix: req.body?.prefix === undefined
+              ? item.prefix || ''
+              : String(req.body.prefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6),
             active: req.body?.active === undefined ? item.active : Boolean(req.body.active),
             kind: item.kind || 'category',
           }
@@ -253,8 +333,20 @@ export function createTaxonomyController(store) {
     async deleteClassification(req, res) {
       const userId = req.auth.user.id
       await store.update((db) => {
-        db.classifications = db.classifications.filter((item) => item.id !== req.params.id)
-        db.categoryParameters = (db.categoryParameters || []).filter((item) => item.classificationId !== req.params.id)
+        const item = db.classifications.find((entry) => entry.id === req.params.id)
+        if (item) {
+          const formatKey = db.formats.find((entry) => entry.id === item.formatId)?.key
+          if (formatKey && item.ageBandId) {
+            const band = db.ageBands.find((entry) => entry.id === item.ageBandId)
+            if (band) band.formatKeys = (band.formatKeys || []).filter((key) => key !== formatKey)
+          }
+          if (formatKey && item.participantTypeId) {
+            const type = db.participantTypes.find((entry) => entry.id === item.participantTypeId)
+            if (type) type.formatKeys = (type.formatKeys || []).filter((key) => key !== formatKey)
+          }
+        }
+        db.classifications = db.classifications.filter((entry) => entry.id !== req.params.id)
+        db.categoryParameters = (db.categoryParameters || []).filter((entry) => entry.classificationId !== req.params.id)
         db.players = db.players.map((player) =>
           player.classificationId === req.params.id ? { ...player, classificationId: null, winner: false } : player,
         )
@@ -264,6 +356,9 @@ export function createTaxonomyController(store) {
 
     async createParameter(req, res) {
       const classificationId = String(req.body?.classificationId || '')
+      if (Array.isArray(req.body?.criterionIds)) {
+        return assignCategoryParameters(store, req, res, classificationId)
+      }
       const name = String(req.body?.name || '').trim()
       const maxMarks = Number(req.body?.maxMarks)
       if (!store.read().classifications.some((item) => item.id === classificationId)) {

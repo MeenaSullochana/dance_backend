@@ -11,6 +11,7 @@ export function playerRoutes(store) {
   router.delete('/:id', requireRole('admin'), players.remove)
   router.patch('/:id/winner', requireRole('admin'), players.toggleWinner)
   router.patch('/:id/live', requireRole('admin'), players.setLive)
+  router.patch('/:id/arrive', requireRole('admin'), players.setArrived)
 
   return router
 }

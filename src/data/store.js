@@ -23,7 +23,7 @@ function withId(doc) {
 }
 
 function normalizePlayer(player) {
-  return {
+  const normalized = {
     danceStyle: player.danceStyle || player.category,
     age: player.age ?? null,
     email: player.email ?? null,
@@ -34,12 +34,23 @@ function normalizePlayer(player) {
       player.formatKey ||
       (player.type === 'group' ? 'group' : player.type === 'couple' ? 'couple' : 'solo'),
     classificationId: player.classificationId ?? null,
-    members: player.members || [],
+    members: (player.members || []).map((member) =>
+      typeof member === 'string' ? { name: member, age: null } : { name: member?.name || '', age: member?.age ?? null },
+    ),
+    registrationStatus: player.registrationStatus || 'registered',
+    feeStatus: player.feeStatus || 'pending',
+    arrived: Boolean(player.arrived),
+    arrivalNo: player.arrivalNo || null,
     photo: player.photo ?? null,
     winner: Boolean(player.winner),
     ...player,
     id: player.id || player._id,
   }
+  const imported = normalized.source === 'google-form' || normalized.source === 'excel'
+  if (imported && (!normalized.feeStatus || normalized.feeStatus === 'pending')) {
+    normalized.feeStatus = 'received'
+  }
+  return normalized
 }
 
 function toDoc(item) {
@@ -48,9 +59,18 @@ function toDoc(item) {
 }
 
 async function replaceCollection(Model, items) {
-  await Model.deleteMany({})
-  if (!items.length) return
-  await Model.insertMany(items.map(toDoc), { ordered: false })
+  const docs = (items || []).map(toDoc).filter((doc) => doc._id)
+  if (!docs.length) {
+    await Model.deleteMany({})
+    return
+  }
+  await Model.bulkWrite(
+    docs.map((doc) => ({
+      replaceOne: { filter: { _id: doc._id }, replacement: doc, upsert: true },
+    })),
+    { ordered: false },
+  )
+  await Model.deleteMany({ _id: { $nin: docs.map((doc) => doc._id) } })
 }
 
 async function loadFromCollections() {

@@ -161,6 +161,10 @@ export function rowsToPlayers(previewRows, startChest) {
         chestNo,
         winner: false,
         source: 'google-form',
+        registrationStatus: 'registered',
+        feeStatus: 'received',
+        arrived: false,
+        arrivalNo: null,
       }
     })
 }
