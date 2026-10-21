@@ -51,14 +51,28 @@ export function scoringMetaFrom(db, classificationId) {
   }
 }
 
+export function scoreAudience(score, users) {
+  if (score?.audience === 'public' || score?.audience === 'judge') return score.audience
+  const person = (users || []).find((user) => user.id === score?.judgeId)
+  return person?.role === 'user' ? 'public' : 'judge'
+}
+
+export function splitScores(db, playerId) {
+  const marks = (db.scores || []).filter((score) => score.playerId === playerId)
+  const judgeScores = marks.filter((score) => scoreAudience(score, db.users) === 'judge')
+  const publicScores = marks.filter((score) => scoreAudience(score, db.users) === 'public')
+  const mean = (list) => (list.length ? list.reduce((sum, score) => sum + Number(score.total || 0), 0) / list.length : 0)
+  return { judgeScores, publicScores, judgeAverage: mean(judgeScores), publicAverage: mean(publicScores) }
+}
+
 export function validateMarks(db, input, classificationId) {
   const active = criteriaForClassification(db, classificationId)
   if (!active.length) return { error: 'Add mark categories in admin first' }
   const criteria = {}
   for (const item of active) {
     const value = Number(input?.[item.key])
-    if (!Number.isInteger(value) || value < 0 || value > Number(item.maxMarks)) {
-      return { error: `${item.name} must be a whole number from 0 to ${item.maxMarks}` }
+    if (!Number.isInteger(value) || value < 1 || value > Number(item.maxMarks)) {
+      return { error: `${item.name} must be a whole number from 1 to ${item.maxMarks}` }
     }
     criteria[item.key] = value
   }

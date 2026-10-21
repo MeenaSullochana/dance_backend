@@ -6,7 +6,8 @@ export function scoreRoutes(store) {
   const router = Router()
   const scores = createScoreController(store)
 
-  router.post('/', requireRole('judge'), scores.submit)
+  router.post('/winners', requireRole('admin'), scores.findWinners)
+  router.post('/', requireRole('judge', 'user'), scores.submit)
 
   return router
 }

@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { newId } from '../data/store.js'
 import { hashPassword, verifyPassword } from '../utils/passwords.js'
 import { fail } from '../utils/response.js'
-import { validateMarks } from '../services/scoring.service.js'
+import { splitScores, validateMarks } from '../services/scoring.service.js'
 import {
   judgeHome,
   judgePlayerDetail,
@@ -105,6 +105,7 @@ export function createAppController(store) {
           id: existing?.id || newId('s'),
           playerId,
           judgeId,
+          audience: 'judge',
           criteria,
           total,
           comment,
@@ -119,6 +120,43 @@ export function createAppController(store) {
         ok: true,
         score: { playerId, criteria, total, comment, maxTotal },
         player: judgePlayerDetail(db, req.auth.user, scored),
+      })
+    },
+
+    async userScore(req, res) {
+      const playerId = String(req.body?.playerId || '')
+      const comment = String(req.body?.comment || '').slice(0, 500)
+      const player = store.read().players.find((item) => item.id === playerId)
+      if (!player) return fail(res, 404, 'Player not found')
+      if (store.read().settings?.livePlayerId !== playerId) {
+        return fail(res, 403, 'Marks are open only while this participant is live')
+      }
+      const checked = validateMarks(store.read(), req.body?.criteria, player.classificationId)
+      if (checked.error) return fail(res, 400, checked.error)
+      const { criteria, total, maxTotal } = checked
+      const userId = req.auth.user.id
+      await store.update((db) => {
+        const existing = db.scores.find((score) => score.playerId === playerId && score.judgeId === userId)
+        const entry = {
+          id: existing?.id || newId('s'),
+          playerId,
+          judgeId: userId,
+          audience: 'public',
+          criteria,
+          total,
+          comment,
+          createdAt: new Date().toISOString(),
+        }
+        db.scores = existing ? db.scores.map((score) => (score.id === existing.id ? entry : score)) : [...db.scores, entry]
+      })
+      const db = store.read()
+      const split = splitScores(db, playerId)
+      res.json({
+        ok: true,
+        score: { playerId, criteria, total, comment, maxTotal },
+        publicAverage: Number(split.publicAverage.toFixed(1)),
+        publicCount: split.publicScores.length,
+        player: userPlayerDetail(db, db.players.find((item) => item.id === playerId)),
       })
     },
 

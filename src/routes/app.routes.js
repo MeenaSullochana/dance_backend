@@ -17,6 +17,7 @@ export function appRoutes(store) {
 
   router.get('/user/home', requireRole('user'), app.userHome)
   router.get('/user/players/:id', requireRole('user'), app.userPlayer)
+  router.post('/user/scores', requireRole('user'), app.userScore)
 
   return router
 }

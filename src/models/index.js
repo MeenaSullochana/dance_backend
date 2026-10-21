@@ -50,6 +50,7 @@ const ScoreSchema = new mongoose.Schema(
     _id: { type: String },
     playerId: { type: String, index: true },
     judgeId: { type: String, index: true },
+    audience: { type: String, default: 'judge' },
     criteria: { type: mongoose.Schema.Types.Mixed, default: {} },
     total: Number,
     comment: { type: String, default: '' },

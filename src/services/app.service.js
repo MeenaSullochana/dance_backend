@@ -1,4 +1,4 @@
-import { criteriaForClassification, maxTotalOf, PASS_PERCENT, scoringMetaFrom } from './scoring.service.js'
+import { criteriaForClassification, maxTotalOf, PASS_PERCENT, scoringMetaFrom, splitScores } from './scoring.service.js'
 import { categoryPrice } from './taxonomy.service.js'
 
 export function scoringMeta(db, classificationId) {
@@ -6,20 +6,21 @@ export function scoringMeta(db, classificationId) {
 }
 
 function playerStats(db, player) {
-  const marks = db.scores.filter((score) => score.playerId === player.id)
+  const { judgeScores, publicScores, judgeAverage, publicAverage } = splitScores(db, player.id)
   const activeJudges = db.users.filter((user) => user.role === 'judge' && user.active !== false)
   const maxTotal = maxTotalOf(criteriaForClassification(db, player.classificationId))
-  const avg = marks.length ? marks.reduce((sum, score) => sum + Number(score.total || 0), 0) / marks.length : 0
-  const percent = (avg / maxTotal) * 100
-  const allJudged = activeJudges.length > 0 && activeJudges.every((judge) => marks.some((score) => score.judgeId === judge.id))
+  const percent = (judgeAverage / maxTotal) * 100
+  const allJudged = activeJudges.length > 0 && activeJudges.every((judge) => judgeScores.some((score) => score.judgeId === judge.id))
   let status = 'pending'
   if (player.winner) status = 'winner'
   else if (allJudged) status = percent >= PASS_PERCENT ? 'qualified' : 'rejected'
-  else if (marks.length) status = 'judged'
+  else if (judgeScores.length) status = 'judged'
   return {
-    average: Number(avg.toFixed(1)),
+    average: Number(judgeAverage.toFixed(1)),
     percent: Number(percent.toFixed(0)),
-    judgeCount: marks.length,
+    judgeCount: judgeScores.length,
+    publicAverage: Number(publicAverage.toFixed(1)),
+    publicCount: publicScores.length,
     status,
   }
 }
@@ -70,7 +71,14 @@ export function playerCard(db, player, { showScore = false, myScore = null } = {
     winner: showScore ? Boolean(player.winner) : false,
     status: showScore ? stats.status : 'hidden',
     score: showScore
-      ? { average: stats.average, percent: stats.percent, judgeCount: stats.judgeCount, maxTotal: maxTotalOf(criteriaForClassification(db, player.classificationId)) }
+      ? {
+          average: stats.average,
+          percent: stats.percent,
+          judgeCount: stats.judgeCount,
+          publicAverage: stats.publicAverage,
+          publicCount: stats.publicCount,
+          maxTotal: maxTotalOf(criteriaForClassification(db, player.classificationId)),
+        }
       : null,
     myScore,
   }
