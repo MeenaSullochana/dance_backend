@@ -1,20 +1,28 @@
 import { randomBytes } from 'node:crypto'
-import { newId } from '../data/store.js'
+import { enterUser } from '../services/access.service.js'
 import { present } from '../utils/present.js'
-import { hashPassword, verifyPassword } from '../utils/passwords.js'
+import { verifyPassword } from '../utils/passwords.js'
 import { fail, sendState } from '../utils/response.js'
 
-const REGISTER_ROLES = ['user']
+function sessionResponse(res, store, result) {
+  if (result.error) return fail(res, result.status, result.error)
+  const user = store.read().users.find((item) => item.id === result.userId)
+  return res.status(result.status).json({ token: result.token, created: Boolean(result.created), ...present(store.read(), user) })
+}
 
 export function createAuthController(store) {
   return {
     async login(req, res) {
+      if (req.body?.role === 'user') {
+        return sessionResponse(res, store, await enterUser(store, req.body))
+      }
+
       const email = String(req.body?.email || '').trim().toLowerCase()
       const password = String(req.body?.password || '')
       const role = req.body?.role
       const user = store
         .read()
-        .users.find((item) => item.email.toLowerCase() === email && verifyPassword(password, item.passwordHash))
+        .users.find((item) => item.email && item.email.toLowerCase() === email && verifyPassword(password, item.passwordHash))
       if (!user) return fail(res, 401, 'Invalid email or password')
       if (role && user.role !== role) return fail(res, 403, `This account is not a ${role}`)
       if (user.approved === false) return fail(res, 403, 'Your account is waiting for admin approval')
@@ -28,33 +36,7 @@ export function createAuthController(store) {
     },
 
     async register(req, res) {
-      const name = String(req.body?.name || '').trim()
-      const email = String(req.body?.email || '').trim()
-      const password = String(req.body?.password || '')
-      const role = req.body?.role
-      if (!name) return fail(res, 400, 'Name is required')
-      if (!email.includes('@')) return fail(res, 400, 'Enter a valid email')
-      if (password.length < 4) return fail(res, 400, 'Password must be at least 4 characters')
-      if (!REGISTER_ROLES.includes(role)) return fail(res, 400, 'Please select a valid role')
-
-      const db = store.read()
-      if (db.users.some((user) => user.email.toLowerCase() === email.toLowerCase())) {
-        return fail(res, 409, 'Email already registered')
-      }
-
-      await store.update((data) => {
-        data.users.push({
-          id: newId(role === 'judge' ? 'j' : 'u'),
-          name,
-          email,
-          passwordHash: hashPassword(password),
-          role,
-          active: true,
-          approved: false,
-          registeredAt: new Date().toISOString(),
-        })
-      })
-      res.status(201).json({ ok: true })
+      return sessionResponse(res, store, await enterUser(store, req.body))
     },
 
     async logout(req, res) {

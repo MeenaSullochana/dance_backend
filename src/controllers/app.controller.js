@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { newId } from '../data/store.js'
-import { hashPassword, verifyPassword } from '../utils/passwords.js'
+import { enterUser } from '../services/access.service.js'
+import { verifyPassword } from '../utils/passwords.js'
 import { fail } from '../utils/response.js'
 import { splitScores, validateMarks } from '../services/scoring.service.js'
 import {
@@ -11,55 +12,41 @@ import {
   userPlayerDetail,
 } from '../services/app.service.js'
 
-function findUser(db, email) {
-  return db.users.find((user) => user.email.toLowerCase() === String(email || '').trim().toLowerCase())
+function userSession(res, store, result) {
+  if (result.error) return fail(res, result.status, result.error)
+  const user = store.read().users.find((item) => item.id === result.userId)
+  return res.status(result.status).json({
+    token: result.token,
+    created: Boolean(result.created),
+    user: profile(user),
+  })
 }
 
 export function createAppController(store) {
   return {
     async login(req, res) {
-      const email = String(req.body?.email || '').trim()
-      const password = String(req.body?.password || '')
       const role = req.body?.role
-      const user = store.read().users.find(
-        (item) => item.email.toLowerCase() === email.toLowerCase() && verifyPassword(password, item.passwordHash),
-      )
-      if (!user) return fail(res, 401, 'Invalid email or password')
-      if (role && user.role !== role) return fail(res, 403, `This account is not a ${role}`)
-      if (role && role !== 'judge' && role !== 'user') return fail(res, 400, 'App login is for judge or user')
-      if (!role && user.role === 'admin') return fail(res, 403, 'Use the website admin login')
-      if (user.approved === false) return fail(res, 403, 'Your account is waiting for admin approval')
-      if (user.active === false) return fail(res, 403, 'This account is deactivated')
-
-      const token = randomBytes(24).toString('hex')
-      await store.update((db) => {
-        db.sessions[token] = user.id
-      })
-      res.json({ token, user: profile(store.read().users.find((item) => item.id === user.id)) })
+      if (role === 'judge') {
+        const email = String(req.body?.email || '').trim().toLowerCase()
+        const password = String(req.body?.password || '')
+        const user = store.read().users.find(
+          (item) => item.email && item.email.toLowerCase() === email && verifyPassword(password, item.passwordHash),
+        )
+        if (!user) return fail(res, 401, 'Invalid email or password')
+        if (user.role !== 'judge') return fail(res, 403, 'This account is not a judge')
+        if (user.active === false) return fail(res, 403, 'This account is deactivated')
+        const token = randomBytes(24).toString('hex')
+        await store.update((db) => {
+          db.sessions[token] = user.id
+        })
+        return res.json({ token, user: profile(store.read().users.find((item) => item.id === user.id)) })
+      }
+      if (role && role !== 'user') return fail(res, 400, 'App login is for judge or user')
+      return userSession(res, store, await enterUser(store, req.body))
     },
 
     async register(req, res) {
-      const name = String(req.body?.name || '').trim()
-      const email = String(req.body?.email || '').trim()
-      const password = String(req.body?.password || '')
-      if (!name) return fail(res, 400, 'Name is required')
-      if (!email.includes('@')) return fail(res, 400, 'Enter a valid email')
-      if (password.length < 4) return fail(res, 400, 'Password must be at least 4 characters')
-      if (findUser(store.read(), email)) return fail(res, 409, 'Email already registered')
-
-      await store.update((db) => {
-        db.users.push({
-          id: newId('u'),
-          name,
-          email,
-          passwordHash: hashPassword(password),
-          role: 'user',
-          active: true,
-          approved: false,
-          registeredAt: new Date().toISOString(),
-        })
-      })
-      res.status(201).json({ ok: true, message: 'Registered. You can log in after admin approval.' })
+      return userSession(res, store, await enterUser(store, req.body))
     },
 
     async logout(req, res) {

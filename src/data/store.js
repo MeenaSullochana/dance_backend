@@ -103,8 +103,9 @@ async function loadFromCollections() {
           resultsPublished: Boolean(settingsDoc.resultsPublished),
           livePlayerId: settingsDoc.livePlayerId || null,
           categoryDefaultsApplied: Boolean(settingsDoc.categoryDefaultsApplied),
+          podium: settingsDoc.podium || null,
         }
-      : { resultsPublished: false, livePlayerId: null, categoryDefaultsApplied: false },
+      : { resultsPublished: false, livePlayerId: null, categoryDefaultsApplied: false, podium: null },
     sessions: sessionMap,
     ageBands: ageBands.map(withId),
     participantTypes: participantTypes.map(withId),
@@ -138,6 +139,7 @@ async function saveCollections(state) {
         resultsPublished: Boolean(state.settings?.resultsPublished),
         livePlayerId: state.settings?.livePlayerId || null,
         categoryDefaultsApplied: Boolean(state.settings?.categoryDefaultsApplied),
+        podium: state.settings?.podium || null,
       },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     ),

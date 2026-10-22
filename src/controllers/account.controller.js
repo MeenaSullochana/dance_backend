@@ -13,7 +13,7 @@ export function createAccountController(store) {
       if (!email.includes('@')) return fail(res, 400, 'Enter a valid email')
       if (password.length < 4) return fail(res, 400, 'Password must be at least 4 characters')
       if (role !== 'judge' && role !== 'user') return fail(res, 400, 'Please select a valid role')
-      if (store.read().users.some((user) => user.email.toLowerCase() === email.toLowerCase())) {
+      if (store.read().users.some((user) => user.email && user.email.toLowerCase() === email.toLowerCase())) {
         return fail(res, 409, 'Email already exists')
       }
 

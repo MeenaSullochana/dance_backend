@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema(
     _id: { type: String },
     name: String,
     email: { type: String, index: true },
+    phone: { type: String, default: null },
     passwordHash: String,
     role: String,
     active: { type: Boolean, default: true },
@@ -65,6 +66,7 @@ const SettingsSchema = new mongoose.Schema(
     resultsPublished: { type: Boolean, default: false },
     livePlayerId: { type: String, default: null },
     categoryDefaultsApplied: { type: Boolean, default: false },
+    podium: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { ...base, collection: 'settings' },
 )

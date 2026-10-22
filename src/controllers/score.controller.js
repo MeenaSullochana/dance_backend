@@ -1,5 +1,5 @@
 import { newId } from '../data/store.js'
-import { splitScores, validateMarks } from '../services/scoring.service.js'
+import { buildPodium, validateMarks } from '../services/scoring.service.js'
 import { fail, sendState } from '../utils/response.js'
 
 export function createScoreController(store) {
@@ -38,23 +38,12 @@ export function createScoreController(store) {
 
     async findWinners(req, res) {
       await store.update((db) => {
-        const grouped = new Map()
-        for (const player of db.players) {
-          if (!player.classificationId) continue
-          const { judgeAverage, judgeScores } = splitScores(db, player.id)
-          const row = { id: player.id, name: player.name, avg: judgeScores.length ? judgeAverage : -1, count: judgeScores.length }
-          const list = grouped.get(player.classificationId) || []
-          list.push(row)
-          grouped.set(player.classificationId, list)
-        }
-        const winnerIds = new Set()
-        for (const list of grouped.values()) {
-          const [top] = list
-            .filter((item) => item.count > 0)
-            .sort((a, b) => b.avg - a.avg || b.count - a.count || a.name.localeCompare(b.name))
-          if (top) winnerIds.add(top.id)
-        }
-        db.players = db.players.map((player) => ({ ...player, winner: winnerIds.has(player.id) }))
+        const podium = buildPodium(db)
+        const categoryWinnerIds = new Set(
+          podium.categories.map((item) => item.places[0]?.playerId).filter(Boolean),
+        )
+        db.settings = { ...db.settings, podium }
+        db.players = db.players.map((player) => ({ ...player, winner: categoryWinnerIds.has(player.id) }))
       })
       sendState(res, store, req.auth.user.id)
     },

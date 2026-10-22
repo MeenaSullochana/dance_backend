@@ -1,0 +1,461 @@
+{
+  "info": {
+    "name": "Dance of District - Website + Mobile App",
+    "description": "Website API is under /api (full site state).\nMobile app API is under /api/app for judge and user only.\n\nSet baseUrl, then run a Login request. The token is saved automatically.\n\nDemo accounts:\n- admin@dance.com / admin123 (website)\n- judge1@dance.com / judge123 (app + website)\n- user@dance.com / user123 (app + website)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "" },
+    { "key": "playerId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Website API",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/health"
+          }
+        },
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "Login Admin",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "if (data.token) pm.collectionVariables.set('token', data.token);"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@dance.com\",\n  \"password\": \"admin123\",\n  \"role\": \"admin\"\n}" },
+                "url": "{{baseUrl}}/api/auth/login"
+              }
+            },
+            {
+              "name": "Login Judge",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "if (data.token) pm.collectionVariables.set('token', data.token);"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"email\": \"judge1@dance.com\",\n  \"password\": \"judge123\",\n  \"role\": \"judge\"\n}" },
+                "url": "{{baseUrl}}/api/auth/login"
+              }
+            },
+            {
+              "name": "Login User",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "if (data.token) pm.collectionVariables.set('token', data.token);"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@dance.com\",\n  \"password\": \"user123\",\n  \"role\": \"user\"\n}" },
+                "url": "{{baseUrl}}/api/auth/login"
+              }
+            },
+            {
+              "name": "Register User",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"New User\",\n  \"email\": \"newuser@dance.com\",\n  \"password\": \"user123\",\n  \"role\": \"user\"\n}" },
+                "url": "{{baseUrl}}/api/auth/register"
+              }
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [],
+                "url": "{{baseUrl}}/api/auth/logout"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get full site state",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/state"
+          }
+        },
+        {
+          "name": "Players",
+          "item": [
+            {
+              "name": "Add player",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Aarav Sharma\",\n  \"formatKey\": \"solo\",\n  \"danceStyle\": \"Hip-Hop Dance\",\n  \"age\": 16,\n  \"participantTypeId\": \"pt3\",\n  \"members\": []\n}" },
+                "url": "{{baseUrl}}/api/players"
+              }
+            },
+            {
+              "name": "Update player",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Aarav Sharma\",\n  \"formatKey\": \"solo\",\n  \"danceStyle\": \"Hip-Hop Dance\",\n  \"age\": 17\n}" },
+                "url": "{{baseUrl}}/api/players/{{playerId}}"
+              }
+            },
+            {
+              "name": "Delete player",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/api/players/{{playerId}}"
+              }
+            },
+            {
+              "name": "Toggle winner",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/api/players/{{playerId}}/winner"
+              }
+            },
+            {
+              "name": "Set player live",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"live\": true\n}" },
+                "url": "{{baseUrl}}/api/players/{{playerId}}/live",
+                "description": "Puts this player on stage. Judges and users get a popup. Send live:false to clear the stage."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accounts",
+          "item": [
+            {
+              "name": "Add judge",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"New Judge\",\n  \"email\": \"judge4@dance.com\",\n  \"password\": \"judge123\",\n  \"role\": \"judge\"\n}" },
+                "url": "{{baseUrl}}/api/accounts"
+              }
+            },
+            {
+              "name": "Approve account",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/api/accounts/:id/approve"
+              }
+            },
+            {
+              "name": "Toggle active",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "PATCH",
+                "header": [],
+                "url": "{{baseUrl}}/api/accounts/:id/toggle"
+              }
+            },
+            {
+              "name": "Delete account",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/api/accounts/:id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit score (website)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"comment\": \"Great energy\",\n  \"criteria\": {\n    \"technique\": 8,\n    \"expression\": 9,\n    \"timing\": 8,\n    \"costume\": 7\n  }\n}" },
+            "url": "{{baseUrl}}/api/scores"
+          }
+        },
+        {
+          "name": "Settings",
+          "item": [
+            {
+              "name": "Publish results",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"resultsPublished\": true\n}" },
+                "url": "{{baseUrl}}/api/settings"
+              }
+            },
+            {
+              "name": "Reset demo data",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [],
+                "url": "{{baseUrl}}/api/reset"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Import Google Form",
+          "item": [
+            {
+              "name": "Preview Excel",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"fileName\": \"responses.xlsx\",\n  \"fileBase64\": \"PASTE_BASE64_HERE\"\n}" },
+                "url": "{{baseUrl}}/api/import/google-form/preview"
+              }
+            },
+            {
+              "name": "Import Excel",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"fileName\": \"responses.xlsx\",\n  \"fileBase64\": \"PASTE_BASE64_HERE\"\n}" },
+                "url": "{{baseUrl}}/api/import/google-form"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Classifications",
+          "item": [
+            {
+              "name": "Add age band",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Kids\",\n  \"minAge\": 5,\n  \"maxAge\": 12\n}" },
+                "url": "{{baseUrl}}/api/age-bands"
+              }
+            },
+            {
+              "name": "Add participant type",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Rotaractor\"\n}" },
+                "url": "{{baseUrl}}/api/participant-types"
+              }
+            },
+            {
+              "name": "Add classification",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"ageBandId\": \"ab2\",\n  \"participantTypeId\": \"pt3\",\n  \"formatId\": \"pf1\"\n}" },
+                "url": "{{baseUrl}}/api/classifications"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark categories",
+          "item": [
+            {
+              "name": "Add mark category",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Choreography\",\n  \"maxMarks\": 15\n}" },
+                "url": "{{baseUrl}}/api/mark-criteria"
+              }
+            },
+            {
+              "name": "Update mark category",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Choreography\",\n  \"maxMarks\": 20,\n  \"active\": true\n}" },
+                "url": "{{baseUrl}}/api/mark-criteria/:id"
+              }
+            },
+            {
+              "name": "Delete mark category",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "DELETE",
+                "header": [],
+                "url": "{{baseUrl}}/api/mark-criteria/:id"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mobile App API",
+      "description": "Compact JSON for the judge and user mobile apps. Admin is website-only.",
+      "item": [
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "App Login Judge",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "if (data.token) pm.collectionVariables.set('token', data.token);"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"email\": \"judge1@dance.com\",\n  \"password\": \"judge123\",\n  \"role\": \"judge\"\n}" },
+                "url": "{{baseUrl}}/api/app/auth/login"
+              }
+            },
+            {
+              "name": "App Login User",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "if (data.token) pm.collectionVariables.set('token', data.token);"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@dance.com\",\n  \"password\": \"user123\",\n  \"role\": \"user\"\n}" },
+                "url": "{{baseUrl}}/api/app/auth/login"
+              }
+            },
+            {
+              "name": "App Register User",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"App User\",\n  \"phone\": \"9876543210\",\n  \"password\": \"user123\"\n}" },
+                "url": "{{baseUrl}}/api/app/auth/register",
+                "description": "User login and register are the same. New email or mobile is approved immediately. The same password signs in. A different password returns 409 Already registered."
+              }
+            },
+            {
+              "name": "My profile",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/app/me"
+              }
+            },
+            {
+              "name": "App Logout",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [],
+                "url": "{{baseUrl}}/api/app/auth/logout"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Judge",
+          "item": [
+            {
+              "name": "Home - all solo",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "const id = data.players && data.players[0] && data.players[0].id;", "if (id) pm.collectionVariables.set('playerId', id);"] } }],
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/app/judge/home?type=single&filter=all",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "app", "judge", "home"],
+                  "query": [
+                    { "key": "type", "value": "single", "description": "single | couple | group" },
+                    { "key": "filter", "value": "all", "description": "all | todo | done" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Home - to mark",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/app/judge/home?type=group&filter=todo"
+              }
+            },
+            {
+              "name": "Player detail",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/app/judge/players/{{playerId}}"
+              }
+            },
+            {
+              "name": "Submit or update marks",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"comment\": \"Sharp timing\",\n  \"criteria\": {\n    \"technique\": 9,\n    \"expression\": 8,\n    \"timing\": 9,\n    \"costume\": 8\n  }\n}" },
+                "url": "{{baseUrl}}/api/app/judge/scores"
+              }
+            }
+          ]
+        },
+        {
+          "name": "User",
+          "item": [
+            {
+              "name": "Home - solo",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "const id = data.players && data.players[0] && data.players[0].id;", "if (id) pm.collectionVariables.set('playerId', id);"] } }],
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/app/user/home?type=single",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "app", "user", "home"],
+                  "query": [{ "key": "type", "value": "single", "description": "single | couple | group" }]
+                }
+              }
+            },
+            {
+              "name": "Home - groups",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/app/user/home?type=group"
+              }
+            },
+            {
+              "name": "Player detail",
+              "request": {
+                "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/app/user/players/{{playerId}}"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

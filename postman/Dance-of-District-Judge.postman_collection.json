@@ -1,0 +1,120 @@
+{
+  "info": {
+    "name": "Dance of District - Judge App",
+    "description": "Mobile API for the judge app. Base path is `/api/app`.\n\n## Setup\n1. Import this collection.\n2. Import `Dance-of-District-Local.postman_environment.json`, or leave `baseUrl` as `http://localhost:4000`.\n3. Run **Login**. The token is saved. **Home** then saves `playerId` from the live participant, or the first player in the list.\n\n## Login\n`POST {{baseUrl}}/api/app/auth/login`\n\n```json\n{ \"email\": \"judge1@dance.com\", \"password\": \"judge123\", \"role\": \"judge\" }\n```\n\nSend `role: \"judge\"`. An admin or user account is rejected.\n\n`200`:\n```json\n{\n  \"token\": \"<hex>\",\n  \"user\": { \"id\": \"j1\", \"name\": \"Rahul Mehra\", \"email\": \"judge1@dance.com\", \"role\": \"judge\", \"active\": true, \"approved\": true }\n}\n```\n\nLater requests send `Authorization: Bearer {{token}}`.\n\n## Screen flow\n1. **Home** — one format at a time. `type` is `single` (solo), `couple`, or `group`. `filter` is `all`, `todo` (this judge has not marked), or `done`.\n2. **Player** — one entry. `parameters` and `criteria` are the mark fields. Each field has `key`, `name`, and `maxMarks`.\n3. **Submit marks** — only while that person is live (`livePlayer.id` or `livePlayerId`). Send one whole number per key, from **1** to that field's `maxMarks`. 0 is rejected. Sending again replaces this judge's score.\n4. **Me** reloads the profile. **Logout** drops the token.\n\nThe winner of a category is the highest judge average. An admin sets that on the website with Find winners. This app does not pick winners.\n\n## Errors\n- `401` Please log in, or invalid email/password.\n- `403` Wrong role, waiting for approval, account off, or marks sent when the participant is not live.\n- `404` Player not found.\n- `400` A mark is missing or not from 1 to maxMarks. The message names the field.\n\nDemo judge: `judge1@dance.com` / `judge123`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "" },
+    { "key": "playerId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const data = pm.response.json();",
+              "pm.test('Judge login returns a token', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(data.token).to.be.a('string').and.not.empty;",
+              "  pm.expect(data.user.role).to.eql('judge');",
+              "});",
+              "if (data.token) pm.collectionVariables.set('token', data.token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"judge1@dance.com\",\n  \"password\": \"judge123\",\n  \"role\": \"judge\"\n}"
+        },
+        "url": "{{baseUrl}}/api/app/auth/login",
+        "description": "Sign in as a judge. Save `token` and send it as a bearer token. Do not use the website `/api/auth/login` route from the app."
+      }
+    },
+    {
+      "name": "Me",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/app/me",
+        "description": "Current judge. Use this when the app still has a saved token. `401` means log in again.\n\n`200`: `{ \"user\": { \"id\", \"name\", \"email\", \"role\": \"judge\", \"active\", \"approved\" } }`"
+      }
+    },
+    {
+      "name": "Home",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const data = pm.response.json();",
+              "const liveId = data.livePlayer && data.livePlayer.id;",
+              "const firstId = data.players && data.players[0] && data.players[0].id;",
+              "if (liveId || firstId) pm.collectionVariables.set('playerId', liveId || firstId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/app/judge/home?type=single&filter=all",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "app", "judge", "home"],
+          "query": [
+            { "key": "type", "value": "single", "description": "single (solo) | couple | group" },
+            { "key": "filter", "value": "all", "description": "all | todo (this judge has not marked) | done" }
+          ]
+        },
+        "description": "Judge home for one format.\n\n`200` includes:\n- `judge` profile\n- `progress`: `{ done, total }` for this format\n- `criteria`: `{ id, key, name, label, maxMarks }`. Marks start at 1, not 0.\n- `maxTotal`, `passPercent` (70), `livePlayerId`\n- `livePlayer`: the person on stage, or null. Marks can be saved only for this id.\n- `players[]`: `id`, `name`, `chestNo`, `type`, `format`, `category`, `danceStyle`, `members`, `age`, `club`, `participantType`, `parameters`, and `myScore` (this judge's saved marks, or null).\n\nOther lists: `?type=couple&filter=todo` and `?type=group&filter=done`."
+      }
+    },
+    {
+      "name": "Player",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/app/judge/players/{{playerId}}",
+        "description": "One participant for the marking screen. Show one round button for each number from 1 to `maxMarks`. Use each `key` when submitting. `myScore` is this judge's saved mark, or null.\n\n`404` if `playerId` is unknown."
+      }
+    },
+    {
+      "name": "Submit marks",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"comment\": \"Sharp timing\",\n  \"criteria\": {\n    \"technique\": 9,\n    \"expression\": 8,\n    \"timing\": 9,\n    \"costume\": 8\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/app/judge/scores",
+        "description": "Save or replace this judge's marks. The participant must be live, or the response is `403`: `Marks are open only while this participant is live`.\n\n`criteria` keys must match the player's `parameters`. Each value is a whole number from **1** to that field's `maxMarks`. 0 is rejected with `400`.\n\nThe sample matches the default fields (Technique, Expression, Timing & Rhythm, Costume & Stage, each max 10). If admin changed the fields, copy the keys from Home or Player.\n\n`200`:\n```json\n{\n  \"ok\": true,\n  \"score\": { \"playerId\": \"...\", \"criteria\": {}, \"total\": 34, \"comment\": \"Sharp timing\", \"maxTotal\": 40 },\n  \"player\": {}\n}\n```\n\n`player.myScore` is the mark just saved. Judge averages are used later by the admin to pick one winner per category."
+      }
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/api/app/auth/logout",
+        "description": "Ends this token. Delete the saved token after `200` `{ \"ok\": true }`."
+      }
+    }
+  ]
+}

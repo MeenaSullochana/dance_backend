@@ -65,6 +65,53 @@ export function splitScores(db, playerId) {
   return { judgeScores, publicScores, judgeAverage: mean(judgeScores), publicAverage: mean(publicScores) }
 }
 
+const PLACE_COUNT = 4
+
+export function buildPodium(db) {
+  const ranked = (db.players || [])
+    .map((player) => {
+      const { judgeAverage, judgeScores } = splitScores(db, player.id)
+      return {
+        id: player.id,
+        name: player.name,
+        classificationId: player.classificationId || null,
+        danceStyle: player.danceStyle || player.category || '',
+        avg: judgeScores.length ? judgeAverage : -1,
+        count: judgeScores.length,
+      }
+    })
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.avg - a.avg || b.count - a.count || a.name.localeCompare(b.name))
+
+  const overallId = ranked[0]?.id || null
+  const categories = []
+  const categoryWinnerIds = new Set()
+  for (const item of (db.classifications || []).filter((row) => row.kind === 'category' && row.active !== false)) {
+    const places = ranked
+      .filter((row) => row.classificationId === item.id && row.id !== overallId)
+      .slice(0, PLACE_COUNT)
+      .map((row, index) => ({ playerId: row.id, place: index + 1, average: Number(row.avg.toFixed(1)) }))
+    if (places[0]) categoryWinnerIds.add(places[0].playerId)
+    categories.push({ classificationId: item.id, places })
+  }
+
+  const styles = []
+  const styleNames = [...new Set(ranked.map((row) => row.danceStyle).filter(Boolean))]
+  for (const danceStyle of styleNames) {
+    const row = ranked.find(
+      (item) => item.danceStyle === danceStyle && item.id !== overallId && !categoryWinnerIds.has(item.id),
+    )
+    if (row) styles.push({ danceStyle, playerId: row.id, average: Number(row.avg.toFixed(1)) })
+  }
+
+  return {
+    overallId,
+    overallAverage: ranked[0] ? Number(ranked[0].avg.toFixed(1)) : null,
+    categories,
+    styles,
+  }
+}
+
 export function validateMarks(db, input, classificationId) {
   const active = criteriaForClassification(db, classificationId)
   if (!active.length) return { error: 'Add mark categories in admin first' }

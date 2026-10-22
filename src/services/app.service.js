@@ -29,7 +29,8 @@ export function profile(user) {
   return {
     id: user.id,
     name: user.name,
-    email: user.email,
+    email: user.email || null,
+    phone: user.phone || null,
     role: user.role,
     active: user.active !== false,
     approved: user.approved !== false,
@@ -145,13 +146,22 @@ export function userHome(db, user, { type = 'single' } = {}) {
     ...scoringMeta(db),
     livePlayer: liveCard(db, published),
     winners: winners.map((player) => playerCard(db, player, { showScore: true })),
+    podium: published ? db.settings?.podium || null : null,
     winnersByCategory: categories.map((item) => {
+      const places = published
+        ? (db.settings?.podium?.categories || []).find((row) => row.classificationId === item.id)?.places || []
+        : []
       const winner = published ? db.players.find((player) => player.winner && player.classificationId === item.id) : null
       return {
         id: item.id,
         name: item.name,
         price: item.price ?? null,
         winner: winner ? playerCard(db, winner, { showScore: true }) : null,
+        places: places.flatMap((place) => {
+          const person = db.players.find((player) => player.id === place.playerId)
+          if (!person) return []
+          return [{ place: place.place, average: place.average, player: playerCard(db, person, { showScore: true }) }]
+        }),
       }
     }),
     players: ranked.map((player) => playerCard(db, player, { showScore: published })),
