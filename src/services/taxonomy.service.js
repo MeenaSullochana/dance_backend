@@ -1,19 +1,20 @@
 export function defaultTaxonomy() {
   const ageBands = [
-    { id: 'ab1', name: 'Kids', minAge: 5, maxAge: 12, active: true, formatKeys: ['solo'] },
-    { id: 'ab2', name: 'Teens', minAge: 13, maxAge: 17, active: true, formatKeys: ['solo'] },
-    { id: 'ab3', name: 'Adults', minAge: 18, maxAge: 40, active: true, formatKeys: ['solo'] },
-    { id: 'ab4', name: 'Open', minAge: 41, maxAge: 99, active: true, formatKeys: ['solo'] },
-    { id: 'ab-junior', name: 'Junior', minAge: 5, maxAge: 17, active: true, formatKeys: ['couple'] },
-    { id: 'ab-senior', name: 'Senior', minAge: 18, maxAge: 99, active: true, formatKeys: ['couple'] },
+    { id: 'ab-tiny', name: 'Tiny Tots', minAge: 3, maxAge: 9, active: true, formatKeys: ['solo'] },
+    { id: 'ab1', name: 'Kids', minAge: 10, maxAge: 14, active: true, formatKeys: ['solo'] },
+    { id: 'ab-young', name: 'Young Adults', minAge: 15, maxAge: 19, active: true, formatKeys: ['solo'] },
+    { id: 'ab3', name: 'Adults', minAge: 24, maxAge: 50, active: true, formatKeys: ['solo'] },
+    { id: 'ab-junior', name: 'Junior', minAge: 5, maxAge: 12, active: true, formatKeys: ['couple'] },
+    { id: 'ab-senior', name: 'Senior', minAge: 12, maxAge: 50, active: true, formatKeys: ['couple'] },
   ]
 
   const participantTypes = [
-    { id: 'pt1', name: 'Rotarian', key: 'rotarian', active: true, formatKeys: ['solo', 'couple'] },
-    { id: 'pt2', name: 'Ann', key: 'ann', active: true, formatKeys: ['solo', 'couple'] },
-    { id: 'pt3', name: 'Annette', key: 'annette', active: true, formatKeys: ['solo', 'couple'] },
+    { id: 'pt1', name: 'Rotarian', key: 'rotarian', active: true, formatKeys: ['solo', 'couple', 'group'] },
+    { id: 'pt2', name: 'Ann', key: 'ann', active: true, formatKeys: ['solo', 'couple', 'group'] },
+    { id: 'pt3', name: 'Annette', key: 'annette', active: true, formatKeys: ['solo', 'couple', 'group'] },
     { id: 'pt4', name: 'Rotaractor', key: 'rotaractor', active: true, formatKeys: ['group'] },
     { id: 'pt5', name: 'DPL (Inter-Club Group)', key: 'dpl', active: true, formatKeys: ['group'] },
+    { id: 'pt6', name: 'Mixed', key: 'mixed', active: true, formatKeys: ['group'] },
   ]
 
   const formats = [
@@ -26,42 +27,105 @@ export function defaultTaxonomy() {
   for (const band of ageBands.filter((item) => item.formatKeys.includes('solo'))) {
     classifications.push({
       id: `cl-solo-${band.id}`,
-      name: `${band.name} · Solo`,
+      name: band.name,
       ageBandId: band.id,
       participantTypeId: null,
       formatId: 'pf1',
-      price: 500,
+      price: 0,
       active: true,
       kind: 'category',
+      parentId: null,
       parametersSeeded: true,
     })
   }
   for (const band of ageBands.filter((item) => item.formatKeys.includes('couple'))) {
     classifications.push({
       id: `cl-couple-${band.id}`,
-      name: `${band.name} · Couple`,
+      name: band.name,
       ageBandId: band.id,
       participantTypeId: null,
       formatId: 'pf2',
-      price: 1000,
+      price: 0,
       active: true,
       kind: 'category',
+      parentId: null,
       parametersSeeded: true,
     })
   }
-  for (const type of participantTypes.filter((item) => item.formatKeys.includes('group'))) {
-    classifications.push({
-      id: `cl-group-${type.id}`,
-      name: `${type.name} · Group`,
+  classifications.push(
+    {
+      id: 'cl-group-pt4',
+      name: 'Rotaractor',
       ageBandId: null,
-      participantTypeId: type.id,
+      participantTypeId: 'pt4',
       formatId: 'pf3',
       price: 1500,
       active: true,
       kind: 'category',
+      parentId: null,
       parametersSeeded: true,
-    })
-  }
+    },
+    {
+      id: 'cl-group-pt5',
+      name: 'DPL',
+      ageBandId: null,
+      participantTypeId: 'pt5',
+      formatId: 'pf3',
+      price: 1500,
+      active: true,
+      kind: 'category',
+      parentId: null,
+      parametersSeeded: true,
+    },
+    {
+      id: 'cl-group-adults',
+      name: 'Adults',
+      ageBandId: null,
+      participantTypeId: null,
+      formatId: 'pf3',
+      price: 1500,
+      active: true,
+      kind: 'category',
+      parentId: null,
+      parametersSeeded: true,
+    },
+    {
+      id: 'cl-group-adults-mixed',
+      name: 'Mixed',
+      ageBandId: null,
+      participantTypeId: 'pt6',
+      formatId: 'pf3',
+      price: 0,
+      active: true,
+      kind: 'category',
+      parentId: 'cl-group-adults',
+      parametersSeeded: true,
+    },
+    {
+      id: 'cl-group-adults-ann',
+      name: 'Ann',
+      ageBandId: null,
+      participantTypeId: 'pt2',
+      formatId: 'pf3',
+      price: 0,
+      active: true,
+      kind: 'category',
+      parentId: 'cl-group-adults',
+      parametersSeeded: true,
+    },
+    {
+      id: 'cl-group-adults-annette',
+      name: 'Annette',
+      ageBandId: null,
+      participantTypeId: 'pt3',
+      formatId: 'pf3',
+      price: 0,
+      active: true,
+      kind: 'category',
+      parentId: 'cl-group-adults',
+      parametersSeeded: true,
+    },
+  )
 
   const categoryParameters = classifications.flatMap((item) =>
     [
@@ -100,15 +164,49 @@ const DEFAULT_FIELDS = [
   ['costume', 'Costume & Stage', 10],
 ]
 
+function typeKeyOf(type) {
+  return String(type?.key || normalizeKey(type?.name)).replace(/\s+/g, '')
+}
+
 function formatKeysForBand(band) {
+  const keys = Array.isArray(band.formatKeys)
+    ? band.formatKeys.filter((key) => ['solo', 'couple', 'group'].includes(key))
+    : []
+  const withoutGroup = keys.filter((key) => key !== 'group')
+  if (withoutGroup.length === 1) return withoutGroup
   const name = String(band.name || '').toLowerCase()
-  if (name.includes('junior') || name.includes('senior')) return ['couple']
+  if (name.startsWith('couple') || /\bjunior\b|\bsenior\b/.test(name)) return ['couple']
+  if (name.startsWith('solo') || /tiny\s*tot|young\s*adult|\bkids?\b/.test(name)) return ['solo']
+  if (withoutGroup.includes('couple') && !withoutGroup.includes('solo')) return ['couple']
   return ['solo']
 }
 
 function formatKeysForType(type) {
-  if (type.key === 'rotaractor' || type.key === 'dpl') return ['group']
-  return ['solo', 'couple']
+  const key = typeKeyOf(type)
+  if (key === 'rotaractor' || key === 'dpl' || key === 'mixed' || key.includes('dpl')) return ['group']
+  return ['solo', 'couple', 'group']
+}
+
+function stripFormatSuffix(name, formats) {
+  let next = String(name || '').trim()
+  for (const format of formats || []) {
+    const suffix = ` · ${format.name}`
+    if (next.endsWith(suffix)) next = next.slice(0, -suffix.length).trim()
+  }
+  return next
+}
+
+const PEOPLE_GROUP_TYPES = new Set(['rotarian', 'ann', 'annette', 'mixed'])
+
+function removeClassifications(db, ids) {
+  const removed = ids instanceof Set ? ids : new Set(ids || [])
+  if (!removed.size) return false
+  db.classifications = (db.classifications || []).filter((item) => !removed.has(item.id))
+  db.categoryParameters = (db.categoryParameters || []).filter((item) => !removed.has(item.classificationId))
+  db.players = (db.players || []).map((player) =>
+    removed.has(player.classificationId) ? { ...player, classificationId: null, winner: false } : player,
+  )
+  return true
 }
 
 function seedFields(db, classificationId) {
@@ -131,10 +229,12 @@ export function ensureCategoryRules(db) {
   let changed = false
   const formats = db.formats || []
   const formatByKey = (key) => formats.find((item) => item.key === key)
+  const formatKeyOf = (item) => formats.find((entry) => entry.id === item.formatId)?.key
 
   for (const band of db.ageBands) {
-    if (!Array.isArray(band.formatKeys)) {
-      band.formatKeys = formatKeysForBand(band)
+    const next = formatKeysForBand(band)
+    if (!Array.isArray(band.formatKeys) || band.formatKeys.join() !== next.join()) {
+      band.formatKeys = next
       changed = true
     }
   }
@@ -149,25 +249,63 @@ export function ensureCategoryRules(db) {
     changed = true
   }
   for (const type of db.participantTypes) {
-    if (!Array.isArray(type.formatKeys)) {
-      type.formatKeys = formatKeysForType(type)
+    const key = typeKeyOf(type)
+    if (!type.key) type.key = key
+    const next = formatKeysForType(type)
+    if (!Array.isArray(type.formatKeys) || !type.formatKeys.length) {
+      type.formatKeys = next
       changed = true
+    } else if (PEOPLE_GROUP_TYPES.has(key) || key === 'rotarian') {
+      const keys = new Set(type.formatKeys)
+      if (!keys.has('group')) {
+        type.formatKeys = [...type.formatKeys, 'group']
+        changed = true
+      }
     }
   }
 
+  const stale = new Set()
+  for (const item of db.classifications || []) {
+    if (item.kind !== 'category') continue
+    const key = formatKeyOf(item)
+    if (key === 'group' && item.ageBandId) stale.add(item.id)
+    if (item.ageBandId) {
+      const band = db.ageBands.find((entry) => entry.id === item.ageBandId)
+      if (!band || !(band.formatKeys || []).includes(key)) stale.add(item.id)
+    }
+    const plain = stripFormatSuffix(item.name, formats)
+    if (plain && plain !== item.name) {
+      item.name = plain
+      changed = true
+    }
+    if (item.parentId === undefined) {
+      item.parentId = null
+      changed = true
+    }
+  }
+  if (removeClassifications(db, stale)) changed = true
+
   const solo = formatByKey('solo')
   const couple = formatByKey('couple')
-  const group = formatByKey('group')
 
-  const ensureCategory = ({ id, name, format, ageBandId = null, participantTypeId = null, price }) => {
+  const ensureCategory = ({ id, name, format, ageBandId = null, participantTypeId = null, parentId = null, price }) => {
     if (!format) return
     let item = db.classifications.find(
       (entry) =>
         entry.kind === 'category' &&
         entry.formatId === format.id &&
         (entry.ageBandId || null) === ageBandId &&
-        (entry.participantTypeId || null) === participantTypeId,
+        (entry.participantTypeId || null) === participantTypeId &&
+        (entry.parentId || null) === parentId,
     )
+    if (!item && participantTypeId) {
+      item = db.classifications.find(
+        (entry) =>
+          entry.kind === 'category' &&
+          entry.formatId === format.id &&
+          entry.participantTypeId === participantTypeId,
+      )
+    }
     if (!item) {
       item = {
         id,
@@ -178,9 +316,14 @@ export function ensureCategoryRules(db) {
         price,
         active: true,
         kind: 'category',
+        parentId,
         parametersSeeded: false,
       }
       db.classifications.push(item)
+      changed = true
+    }
+    if (item.parentId === undefined) {
+      item.parentId = parentId
       changed = true
     }
     if (item.price === undefined || item.price === null) {
@@ -189,6 +332,11 @@ export function ensureCategoryRules(db) {
     }
     if (item.kind !== 'category') {
       item.kind = 'category'
+      changed = true
+    }
+    const plain = stripFormatSuffix(item.name, formats)
+    if (plain && plain !== item.name) {
+      item.name = plain
       changed = true
     }
     if (!item.parametersSeeded && !db.categoryParameters.some((field) => field.classificationId === item.id)) {
@@ -204,40 +352,21 @@ export function ensureCategoryRules(db) {
   for (const band of db.ageBands.filter((item) => item.active !== false && (item.formatKeys || []).includes('solo'))) {
     ensureCategory({
       id: `cl-solo-${band.id}`,
-      name: `${band.name} · Solo`,
+      name: band.name,
       format: solo,
       ageBandId: band.id,
-      price: 500,
+      price: 0,
     })
   }
   for (const band of db.ageBands.filter((item) => item.active !== false && (item.formatKeys || []).includes('couple'))) {
     ensureCategory({
       id: `cl-couple-${band.id}`,
-      name: `${band.name} · Couple`,
+      name: band.name,
       format: couple,
       ageBandId: band.id,
-      price: 1000,
+      price: 0,
     })
   }
-  for (const band of db.ageBands.filter((item) => item.active !== false)) {
-    ensureCategory({
-      id: `cl-group-age-${band.id}`,
-      name: `${band.name} · Group`,
-      format: group,
-      ageBandId: band.id,
-      price: 1500,
-    })
-  }
-  for (const type of db.participantTypes.filter((item) => item.active !== false && (item.formatKeys || []).includes('group'))) {
-    ensureCategory({
-      id: `cl-group-${type.id}`,
-      name: `${type.name} · Group`,
-      format: group,
-      participantTypeId: type.id,
-      price: 1500,
-    })
-  }
-
   return changed
 }
 
@@ -266,6 +395,7 @@ export function parseParticipantType(value, types) {
   if (text === 'ann' || text.startsWith('ann ')) return types.find((type) => type.key === 'ann') || null
   if (text.includes('dpl') || text.includes('inter club')) return types.find((type) => type.key === 'dpl') || null
   if (text.includes('rotarian')) return types.find((type) => type.key === 'rotarian') || null
+  if (text.includes('mixed')) return types.find((type) => type.key === 'mixed') || null
   return types.find((type) => text.includes(normalizeKey(type.name)) || text.includes(type.key)) || null
 }
 
@@ -372,33 +502,23 @@ export function findClassification(db, { age, participantTypeId, formatKey }) {
     (item) => item.active !== false && item.kind === 'category' && item.formatId === format.id,
   )
   if (formatKey === 'group') {
-    const band = findAgeBand(db.ageBands, age, 'group')
-    if (band) {
-      const byAge = categories.find((item) => item.ageBandId === band.id)
-      if (byAge) return byAge
+    if (participantTypeId) {
+      const byType = categories.find((item) => item.participantTypeId === participantTypeId)
+      if (byType) return byType
     }
-    if (!participantTypeId) return null
+    const children = categories.filter((item) => item.parentId)
+    const parents = categories.filter((item) => !item.parentId)
+    const mixed = children.find((item) => /mixed/i.test(item.name))
+    if (mixed) return mixed
     return (
-      categories.find((item) => item.participantTypeId === participantTypeId) ||
-      (db.classifications || []).find(
-        (item) => item.active !== false && item.formatId === format.id && item.participantTypeId === participantTypeId,
-      ) ||
+      parents.find((item) => /adult/i.test(item.name) && !item.participantTypeId) ||
+      parents.find((item) => !item.participantTypeId) ||
       null
     )
   }
   const band = findAgeBand(db.ageBands, age, formatKey)
   if (!band) return null
-  return (
-    categories.find((item) => item.ageBandId === band.id) ||
-    (db.classifications || []).find(
-      (item) =>
-        item.active !== false &&
-        item.ageBandId === band.id &&
-        item.formatId === format.id &&
-        (!participantTypeId || item.participantTypeId === participantTypeId),
-    ) ||
-    null
-  )
+  return categories.find((item) => item.ageBandId === band.id) || null
 }
 
 export function classificationLabel(db, classificationId) {
@@ -407,14 +527,24 @@ export function classificationLabel(db, classificationId) {
 }
 
 export function buildClassificationName(db, rule) {
+  if (rule.name?.trim()) return stripFormatSuffix(rule.name.trim(), db.formats)
   const band = db.ageBands.find((item) => item.id === rule.ageBandId)
   const type = db.participantTypes.find((item) => item.id === rule.participantTypeId)
-  const format = db.formats.find((item) => item.id === rule.formatId)
-  if (rule.name?.trim()) return rule.name.trim()
-  return [band?.name, format?.name, type?.name].filter(Boolean).join(' · ')
+  return band?.name || type?.name || 'Category'
 }
 
 export function categoryPrice(db, classificationId) {
   const item = (db.classifications || []).find((entry) => entry.id === classificationId)
-  return item && item.price !== undefined && item.price !== null ? Number(item.price) : null
+  if (!item) return null
+  if (item.parentId) {
+    const parent = (db.classifications || []).find((entry) => entry.id === item.parentId)
+    if (parent && parent.price !== undefined && parent.price !== null) return Number(parent.price)
+  }
+  return item.price !== undefined && item.price !== null ? Number(item.price) : null
+}
+
+export function competingCategories(classifications) {
+  const list = classifications || []
+  const parentIds = new Set(list.filter((item) => item.parentId).map((item) => item.parentId))
+  return list.filter((item) => item.kind === 'category' && item.active !== false && !parentIds.has(item.id))
 }

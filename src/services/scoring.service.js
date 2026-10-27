@@ -86,7 +86,8 @@ export function buildPodium(db) {
   const overallId = ranked[0]?.id || null
   const categories = []
   const categoryWinnerIds = new Set()
-  for (const item of (db.classifications || []).filter((row) => row.kind === 'category' && row.active !== false)) {
+  const parentIds = new Set((db.classifications || []).filter((row) => row.parentId).map((row) => row.parentId))
+  for (const item of (db.classifications || []).filter((row) => row.kind === 'category' && row.active !== false && !parentIds.has(row.id))) {
     const places = ranked
       .filter((row) => row.classificationId === item.id && row.id !== overallId)
       .slice(0, PLACE_COUNT)

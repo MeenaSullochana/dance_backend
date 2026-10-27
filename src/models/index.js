@@ -138,6 +138,7 @@ const ClassificationSchema = new mongoose.Schema(
     price: { type: Number, default: 0 },
     prefix: { type: String, default: '' },
     kind: { type: String, default: '' },
+    parentId: { type: String, default: null, index: true },
     parametersSeeded: { type: Boolean, default: false },
   },
   { ...base, collection: 'classifications' },

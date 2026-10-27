@@ -71,11 +71,37 @@ function renameLinkedCategories(db, { ageBandId, participantTypeId, previousName
   db.classifications = db.classifications.map((item) => {
     if (ageBandId && item.ageBandId !== ageBandId) return item
     if (participantTypeId && item.participantTypeId !== participantTypeId) return item
-    const formatName = db.formats.find((entry) => entry.id === item.formatId)?.name || ''
-    const auto = `${previousName} · ${formatName}`
-    if (item.name !== auto && item.name !== previousName) return item
-    return { ...item, name: `${nextName} · ${formatName}`.replace(/\s·\s$/, '') }
+    if (item.name !== previousName) return item
+    return { ...item, name: nextName }
   })
+}
+
+function findOrCreateType(db, name, formatKeys) {
+  const key = normalizeKey(name).replace(/\s+/g, '')
+  let type = db.participantTypes.find(
+    (item) => item.key === key || normalizeKey(item.name) === normalizeKey(name),
+  )
+  if (type) {
+    const keys = new Set(type.formatKeys || [])
+    for (const item of formatKeys || []) keys.add(item)
+    type.formatKeys = [...keys]
+    return type
+  }
+  type = {
+    id: newId('pt'),
+    name,
+    key: key || newId('type'),
+    active: true,
+    formatKeys: formatKeys?.length ? formatKeys : ['group'],
+  }
+  db.participantTypes.push(type)
+  return type
+}
+
+function defaultTypeFormats(name) {
+  const key = normalizeKey(name).replace(/\s+/g, '')
+  if (key.includes('rotaract') || key.includes('dpl') || key === 'mixed') return ['group']
+  return ['solo', 'couple', 'group']
 }
 
 function cleanPrice(value) {
@@ -149,7 +175,7 @@ export function createTaxonomyController(store) {
       if (store.read().participantTypes.some((type) => type.key === key)) {
         return fail(res, 409, 'That participant type already exists')
       }
-      const formatKeys = cleanFormatKeys(req.body?.formatKeys, ['solo'])
+      const formatKeys = cleanFormatKeys(req.body?.formatKeys, defaultTypeFormats(name))
       const userId = req.auth.user.id
       await store.update((db) => {
         db.participantTypes.push({ id: newId('pt'), name, key, active: true, formatKeys })
@@ -236,41 +262,66 @@ export function createTaxonomyController(store) {
       const db = store.read()
       const format = db.formats.find((item) => item.id === formatId)
       if (!format) return fail(res, 400, 'Choose Solo / Couple / Group')
-      const price = cleanPrice(req.body?.price ?? 0)
+      const name = String(req.body?.name || '').trim()
+      if (!name) return fail(res, 400, 'Category name is required')
+      const parentId = String(req.body?.parentId || '') || null
+      if (parentId) {
+        const parent = db.classifications.find((item) => item.id === parentId)
+        if (!parent || parent.formatId !== formatId) return fail(res, 400, 'Parent category not found')
+        if (parent.parentId) return fail(res, 400, 'Cannot nest under a sub-category')
+      }
+      const price = parentId ? 0 : cleanPrice(req.body?.price ?? 0)
       if (price === null) return fail(res, 400, 'Enter a valid price')
-      const ageBandId = format.key === 'group' ? null : String(req.body?.ageBandId || '')
-      const participantTypeId = format.key === 'group' ? String(req.body?.participantTypeId || '') : null
-      if (format.key === 'group') {
-        if (!db.participantTypes.some((type) => type.id === participantTypeId)) {
-          return fail(res, 400, 'Choose the group type, such as Rotaractor')
+      if (format.key !== 'group') {
+        const ageBandId = String(req.body?.ageBandId || '')
+        if (!db.ageBands.some((band) => band.id === ageBandId)) {
+          return fail(res, 400, 'Choose the age category for this format')
         }
-      } else if (!db.ageBands.some((band) => band.id === ageBandId)) {
-        return fail(res, 400, 'Choose the age category for this format')
       }
-      if (
-        db.classifications.some(
-          (item) =>
-            item.kind === 'category' &&
-            item.formatId === formatId &&
-            (item.ageBandId || null) === ageBandId &&
-            (item.participantTypeId || null) === participantTypeId,
-        )
-      ) {
-        return fail(res, 409, 'That category already exists')
-      }
-      const draft = { name: String(req.body?.name || '').trim(), ageBandId, participantTypeId, formatId }
       const userId = req.auth.user.id
+      let error = null
       await store.update((data) => {
+        const currentFormat = data.formats.find((item) => item.id === formatId)
+        let ageBandId = null
+        let participantTypeId = String(req.body?.participantTypeId || '') || null
+        if (currentFormat.key === 'group') {
+          if (participantTypeId && !data.participantTypes.some((type) => type.id === participantTypeId)) {
+            participantTypeId = null
+          }
+          if (!participantTypeId) {
+            const folder = /adults?/i.test(name) && !parentId
+            if (!folder) {
+              const type = findOrCreateType(data, name, parentId ? ['group'] : defaultTypeFormats(name))
+              participantTypeId = type.id
+            }
+          }
+        } else {
+          ageBandId = String(req.body?.ageBandId || '') || null
+        }
+        if (
+          data.classifications.some(
+            (item) =>
+              item.kind === 'category' &&
+              item.formatId === formatId &&
+              (item.parentId || null) === parentId &&
+              (normalizeKey(item.name) === normalizeKey(name) ||
+                (participantTypeId && item.participantTypeId === participantTypeId && (item.ageBandId || null) === ageBandId)),
+          )
+        ) {
+          error = 'That category already exists'
+          return
+        }
         const id = newId('cl')
         data.classifications.push({
           id,
-          name: buildClassificationName(data, draft),
+          name: buildClassificationName(data, { name, ageBandId, participantTypeId, formatId }),
           ageBandId,
           participantTypeId,
           formatId,
           price,
           active: true,
           kind: 'category',
+          parentId,
           parametersSeeded: true,
         })
         data.categoryParameters.push(
@@ -279,10 +330,10 @@ export function createTaxonomyController(store) {
             ['expression', 'Expression', 10],
             ['timing', 'Timing & Rhythm', 10],
             ['costume', 'Costume & Stage', 10],
-          ].map(([key, name, maxMarks], index) => ({
+          ].map(([key, fieldName, maxMarks], index) => ({
             id: newId('cp'),
             classificationId: id,
-            name,
+            name: fieldName,
             key,
             maxMarks,
             sortOrder: index + 1,
@@ -290,6 +341,7 @@ export function createTaxonomyController(store) {
           })),
         )
       })
+      if (error) return fail(res, 409, error)
       sendState(res, store, userId)
     },
 
@@ -303,12 +355,16 @@ export function createTaxonomyController(store) {
         db.classifications = db.classifications.map((item) => {
           if (item.id !== req.params.id) return item
           found = true
+          const child = Boolean(item.parentId)
           const next = {
             ...item,
             ageBandId: req.body?.ageBandId === undefined ? item.ageBandId : req.body.ageBandId || null,
             participantTypeId: req.body?.participantTypeId === undefined ? item.participantTypeId : req.body.participantTypeId || null,
             formatId: req.body?.formatId || item.formatId,
-            price: req.body?.price === undefined ? item.price ?? 0 : cleanPrice(req.body.price),
+            parentId: req.body?.parentId === undefined ? item.parentId || null : req.body.parentId || null,
+            price: child
+              ? 0
+              : req.body?.price === undefined ? item.price ?? 0 : cleanPrice(req.body.price),
             prefix: req.body?.prefix === undefined
               ? item.prefix || ''
               : String(req.body.prefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6),
@@ -330,21 +386,20 @@ export function createTaxonomyController(store) {
       const userId = req.auth.user.id
       await store.update((db) => {
         const item = db.classifications.find((entry) => entry.id === req.params.id)
-        if (item) {
-          const formatKey = db.formats.find((entry) => entry.id === item.formatId)?.key
-          if (formatKey && item.ageBandId) {
-            const band = db.ageBands.find((entry) => entry.id === item.ageBandId)
-            if (band) band.formatKeys = (band.formatKeys || []).filter((key) => key !== formatKey)
-          }
-          if (formatKey && item.participantTypeId) {
-            const type = db.participantTypes.find((entry) => entry.id === item.participantTypeId)
-            if (type) type.formatKeys = (type.formatKeys || []).filter((key) => key !== formatKey)
-          }
+        const removed = new Set([req.params.id])
+        for (const child of db.classifications.filter((entry) => entry.parentId === req.params.id)) {
+          removed.add(child.id)
         }
-        db.classifications = db.classifications.filter((entry) => entry.id !== req.params.id)
-        db.categoryParameters = (db.categoryParameters || []).filter((entry) => entry.classificationId !== req.params.id)
+        if (item?.ageBandId) {
+          const stillUsed = db.classifications.some(
+            (entry) => entry.ageBandId === item.ageBandId && !removed.has(entry.id),
+          )
+          if (!stillUsed) db.ageBands = db.ageBands.filter((band) => band.id !== item.ageBandId)
+        }
+        db.classifications = db.classifications.filter((entry) => !removed.has(entry.id))
+        db.categoryParameters = (db.categoryParameters || []).filter((entry) => !removed.has(entry.classificationId))
         db.players = db.players.map((player) =>
-          player.classificationId === req.params.id ? { ...player, classificationId: null, winner: false } : player,
+          removed.has(player.classificationId) ? { ...player, classificationId: null, winner: false } : player,
         )
       })
       sendState(res, store, userId)

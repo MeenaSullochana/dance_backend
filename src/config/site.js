@@ -16,3 +16,19 @@ export const backendUrl = trimUrl(
 export const mongoUrl = String(process.env.MONGO_URL || '').trim()
 export const port = Number(process.env.PORT) || Number(new URL(backendUrl).port) || 7000
 export const isProduction = production
+
+const fromEnv = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((value) => trimUrl(value))
+  .filter(Boolean)
+
+export const corsOrigins = [
+  ...new Set([
+    frontendUrl,
+    ...fromEnv,
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://dance-site.netlify.app',
+    'https://dod.senatespace.in',
+  ]),
+]

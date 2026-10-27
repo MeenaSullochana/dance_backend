@@ -1,3 +1,4 @@
+import { competingCategories } from './taxonomy.service.js'
 import { criteriaForClassification, maxTotalOf, PASS_PERCENT, publicMaxMarks, scoringMetaFrom, splitScores } from './scoring.service.js'
 import { categoryPrice } from './taxonomy.service.js'
 
@@ -141,7 +142,7 @@ export function userHome(db, user, { type = 'single' } = {}) {
     ? [...ofType].sort((a, b) => playerStats(db, b).average - playerStats(db, a).average)
     : ofType
   const winners = published ? db.players.filter((player) => player.winner) : []
-  const categories = (db.classifications || []).filter((item) => item.kind === 'category' && item.active !== false)
+  const categories = competingCategories(db.classifications)
 
   return {
     user: profile(user),
