@@ -301,9 +301,46 @@ export function formatKeyToPlayerType(formatKey) {
   return 'single'
 }
 
+export function ageFloor(band) {
+  return band?.minAge == null || band?.minAge === '' ? Number.NEGATIVE_INFINITY : Number(band.minAge)
+}
+
+export function ageCeil(band) {
+  return band?.maxAge == null || band?.maxAge === '' ? Number.POSITIVE_INFINITY : Number(band.maxAge)
+}
+
+export function bandCoversAge(band, age) {
+  const ageNum = Number(age)
+  if (!Number.isFinite(ageNum)) return false
+  return ageNum >= ageFloor(band) && ageNum <= ageCeil(band)
+}
+
+export function bandSpan(band) {
+  const min = band?.minAge == null || band?.minAge === '' ? 0 : Number(band.minAge)
+  const max = band?.maxAge == null || band?.maxAge === '' ? 120 : Number(band.maxAge)
+  return Math.max(0, max - min)
+}
+
+/** Accept open ranges: blank from = under max, blank to = min+. */
+export function parseAgeBounds(minRaw, maxRaw) {
+  const read = (value) => {
+    if (value === null || value === undefined || value === '') return null
+    const number = Number(value)
+    if (!Number.isInteger(number) || number < 1 || number > 120) return { error: 'Enter ages from 1 to 120, or leave blank for open ranges' }
+    return number
+  }
+  const minAge = read(minRaw)
+  if (minAge?.error) return minAge
+  const maxAge = read(maxRaw)
+  if (maxAge?.error) return maxAge
+  if (minAge === null && maxAge === null) return { error: 'Enter a from age, a to age, or both' }
+  if (minAge !== null && maxAge !== null && minAge > maxAge) return { error: 'From age cannot be greater than to age' }
+  return { minAge, maxAge }
+}
+
 function narrowestBand(bands) {
   return [...bands].sort(
-    (a, b) => (Number(a.maxAge) - Number(a.minAge)) - (Number(b.maxAge) - Number(b.minAge)) || Number(a.minAge) - Number(b.minAge),
+    (a, b) => bandSpan(a) - bandSpan(b) || ageFloor(a) - ageFloor(b),
   )[0] || null
 }
 
@@ -311,7 +348,7 @@ export function findAgeBand(ageBands, age, formatKey) {
   if (age === null || age === undefined || !Number.isFinite(Number(age))) return null
   const ageNum = Number(age)
   const matches = (ageBands || []).filter(
-    (band) => band.active !== false && ageNum >= Number(band.minAge) && ageNum <= Number(band.maxAge),
+    (band) => band.active !== false && bandCoversAge(band, ageNum),
   )
   if (formatKey) {
     const scoped = matches.filter((band) => (band.formatKeys || []).includes(formatKey))

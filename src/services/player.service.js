@@ -2,6 +2,12 @@ import { findClassification, formatKeyToPlayerType, typeAllowsFormat } from './t
 
 const FEE_STATUSES = ['received', 'not_received', 'doubt']
 
+function cleanTrack(value, label) {
+  if (value === '' || value === null || value === undefined) return { value: null }
+  if (!FEE_STATUSES.includes(value)) return { error: `Choose the ${label}: received, not received, or doubt` }
+  return { value }
+}
+
 function cleanMembers(value) {
   if (!Array.isArray(value)) return { members: [] }
   const members = []
@@ -93,8 +99,11 @@ export function buildPlayerPayload(db, body) {
   const category = classification?.name || danceStyle
   const photo = cleanPhoto(body?.photo)
   if (photo === false) return { error: 'Photo is too large' }
-  const feeStatus = FEE_STATUSES.includes(body?.feeStatus) ? body.feeStatus : null
-  if (!feeStatus) return { error: 'Choose the fee: received, not received, or doubt' }
+  const fee = cleanTrack(body?.feeStatus, 'fee')
+  if (fee.error) return { error: fee.error }
+  if (!fee.value) return { error: 'Choose the fee: received, not received, or doubt' }
+  const pendrive = cleanTrack(body?.pendriveStatus, 'pendrive')
+  if (pendrive.error) return { error: pendrive.error }
 
   return {
     player: {
@@ -112,7 +121,8 @@ export function buildPlayerPayload(db, body) {
       participantTypeId,
       classificationId,
       registrationStatus: 'registered',
-      feeStatus,
+      feeStatus: fee.value,
+      pendriveStatus: pendrive.value,
     },
   }
 }

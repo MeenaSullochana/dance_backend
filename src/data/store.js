@@ -39,6 +39,7 @@ function normalizePlayer(player) {
     ),
     registrationStatus: player.registrationStatus || 'registered',
     feeStatus: player.feeStatus || 'pending',
+    pendriveStatus: player.pendriveStatus || null,
     arrived: Boolean(player.arrived),
     arrivalNo: player.arrivalNo || null,
     photo: player.photo ?? null,
@@ -49,6 +50,9 @@ function normalizePlayer(player) {
   const imported = normalized.source === 'google-form' || normalized.source === 'excel'
   if (imported && (!normalized.feeStatus || normalized.feeStatus === 'pending')) {
     normalized.feeStatus = 'received'
+  }
+  if (!['received', 'not_received', 'doubt'].includes(normalized.pendriveStatus)) {
+    normalized.pendriveStatus = null
   }
   return normalized
 }
@@ -104,8 +108,9 @@ async function loadFromCollections() {
           livePlayerId: settingsDoc.livePlayerId || null,
           categoryDefaultsApplied: Boolean(settingsDoc.categoryDefaultsApplied),
           podium: settingsDoc.podium || null,
+          publicMaxMarks: Number(settingsDoc.publicMaxMarks) || 10,
         }
-      : { resultsPublished: false, livePlayerId: null, categoryDefaultsApplied: false, podium: null },
+      : { resultsPublished: false, livePlayerId: null, categoryDefaultsApplied: false, podium: null, publicMaxMarks: 10 },
     sessions: sessionMap,
     ageBands: ageBands.map(withId),
     participantTypes: participantTypes.map(withId),
@@ -140,6 +145,7 @@ async function saveCollections(state) {
         livePlayerId: state.settings?.livePlayerId || null,
         categoryDefaultsApplied: Boolean(state.settings?.categoryDefaultsApplied),
         podium: state.settings?.podium || null,
+        publicMaxMarks: Number(state.settings?.publicMaxMarks) || 10,
       },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     ),

@@ -133,4 +133,20 @@ export function ensureMarkCriteria(state) {
   }
   if (!state.settings) state.settings = { resultsPublished: false, livePlayerId: null }
   if (state.settings.livePlayerId === undefined) state.settings.livePlayerId = null
+  if (!Number(state.settings.publicMaxMarks)) state.settings.publicMaxMarks = 10
+}
+
+export function publicMaxMarks(db) {
+  const value = Number(db?.settings?.publicMaxMarks)
+  return Number.isInteger(value) && value >= 1 && value <= 100 ? value : 10
+}
+
+export function validatePublicMark(db, input) {
+  const max = publicMaxMarks(db)
+  const raw = input?.overall ?? input?.mark ?? input?.total
+  const value = Number(raw)
+  if (!Number.isInteger(value) || value < 1 || value > max) {
+    return { error: `Overall mark must be a whole number from 1 to ${max}` }
+  }
+  return { criteria: { overall: value }, total: value, maxTotal: max }
 }

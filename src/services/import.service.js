@@ -163,6 +163,7 @@ export function rowsToPlayers(previewRows, startChest) {
         source: 'google-form',
         registrationStatus: 'registered',
         feeStatus: 'received',
+        pendriveStatus: null,
         arrived: false,
         arrivalNo: null,
       }

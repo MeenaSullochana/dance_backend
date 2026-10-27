@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema(
     name: String,
     email: { type: String, index: true },
     phone: { type: String, default: null },
+    club: { type: String, default: null },
     passwordHash: String,
     role: String,
     active: { type: Boolean, default: true },
@@ -27,6 +28,7 @@ const PlayerSchema = new mongoose.Schema(
     members: { type: [mongoose.Schema.Types.Mixed], default: [] },
     registrationStatus: { type: String, default: 'registered' },
     feeStatus: { type: String, default: 'pending' },
+    pendriveStatus: { type: String, default: null },
     arrived: { type: Boolean, default: false },
     arrivalNo: { type: String, default: null },
     photo: { type: String, default: null },
@@ -67,6 +69,7 @@ const SettingsSchema = new mongoose.Schema(
     livePlayerId: { type: String, default: null },
     categoryDefaultsApplied: { type: Boolean, default: false },
     podium: { type: mongoose.Schema.Types.Mixed, default: null },
+    publicMaxMarks: { type: Number, default: 10 },
   },
   { ...base, collection: 'settings' },
 )

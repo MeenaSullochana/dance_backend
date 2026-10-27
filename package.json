@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development node --watch src/server.js",
-    "start": "cross-env NODE_ENV=production node src/server.js",
+    "dev": "cross-env NODE_ENV=development node src/server.js",
+    "dev:watch": "cross-env NODE_ENV=development node --watch src/server.js",
+    "start": "node scripts/start.js",
     "start:dev": "cross-env NODE_ENV=development node src/server.js"
   },
   "dependencies": {

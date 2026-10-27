@@ -1,4 +1,4 @@
-import { criteriaForClassification, maxTotalOf, PASS_PERCENT, scoringMetaFrom, splitScores } from './scoring.service.js'
+import { criteriaForClassification, maxTotalOf, PASS_PERCENT, publicMaxMarks, scoringMetaFrom, splitScores } from './scoring.service.js'
 import { categoryPrice } from './taxonomy.service.js'
 
 export function scoringMeta(db, classificationId) {
@@ -31,6 +31,7 @@ export function profile(user) {
     name: user.name,
     email: user.email || null,
     phone: user.phone || null,
+    club: user.club || null,
     role: user.role,
     active: user.active !== false,
     approved: user.approved !== false,
@@ -41,12 +42,12 @@ function lookupName(list, id) {
   return list.find((item) => item.id === id)?.name || null
 }
 
-function liveCard(db, showScore) {
+function liveCard(db, showScore, audience = 'judge') {
   const player = db.players.find((item) => item.id === db.settings?.livePlayerId)
-  return player ? playerCard(db, player, { showScore }) : null
+  return player ? playerCard(db, player, { showScore, audience }) : null
 }
 
-export function playerCard(db, player, { showScore = false, myScore = null } = {}) {
+export function playerCard(db, player, { showScore = false, myScore = null, audience = 'judge' } = {}) {
   const stats = playerStats(db, player)
   return {
     id: player.id,
@@ -62,12 +63,14 @@ export function playerCard(db, player, { showScore = false, myScore = null } = {
     participantType: lookupName(db.participantTypes || [], player.participantTypeId),
     classification: lookupName(db.classifications || [], player.classificationId),
     price: categoryPrice(db, player.classificationId),
-    parameters: criteriaForClassification(db, player.classificationId).map((item) => ({
-      id: item.id,
-      key: item.key,
-      name: item.name,
-      maxMarks: Number(item.maxMarks),
-    })),
+    parameters: audience === 'public'
+      ? [{ id: 'overall', key: 'overall', name: 'Overall', maxMarks: publicMaxMarks(db) }]
+      : criteriaForClassification(db, player.classificationId).map((item) => ({
+          id: item.id,
+          key: item.key,
+          name: item.name,
+          maxMarks: Number(item.maxMarks),
+        })),
     photo: player.photo || null,
     winner: showScore ? Boolean(player.winner) : false,
     status: showScore ? stats.status : 'hidden',
@@ -78,6 +81,7 @@ export function playerCard(db, player, { showScore = false, myScore = null } = {
           judgeCount: stats.judgeCount,
           publicAverage: stats.publicAverage,
           publicCount: stats.publicCount,
+          publicMaxMarks: publicMaxMarks(db),
           maxTotal: maxTotalOf(criteriaForClassification(db, player.classificationId)),
         }
       : null,
@@ -144,8 +148,10 @@ export function userHome(db, user, { type = 'single' } = {}) {
     resultsPublished: published,
     type,
     ...scoringMeta(db),
-    livePlayer: liveCard(db, published),
-    winners: winners.map((player) => playerCard(db, player, { showScore: true })),
+    publicMaxMarks: publicMaxMarks(db),
+    criteria: [{ id: 'overall', key: 'overall', name: 'Overall', label: 'Overall', maxMarks: publicMaxMarks(db) }],
+    livePlayer: liveCard(db, published, 'public'),
+    winners: winners.map((player) => playerCard(db, player, { showScore: true, audience: 'public' })),
     podium: published ? db.settings?.podium || null : null,
     winnersByCategory: categories.map((item) => {
       const places = published
@@ -156,15 +162,15 @@ export function userHome(db, user, { type = 'single' } = {}) {
         id: item.id,
         name: item.name,
         price: item.price ?? null,
-        winner: winner ? playerCard(db, winner, { showScore: true }) : null,
+        winner: winner ? playerCard(db, winner, { showScore: true, audience: 'public' }) : null,
         places: places.flatMap((place) => {
           const person = db.players.find((player) => player.id === place.playerId)
           if (!person) return []
-          return [{ place: place.place, average: place.average, player: playerCard(db, person, { showScore: true }) }]
+          return [{ place: place.place, average: place.average, player: playerCard(db, person, { showScore: true, audience: 'public' }) }]
         }),
       }
     }),
-    players: ranked.map((player) => playerCard(db, player, { showScore: published })),
+    players: ranked.map((player) => playerCard(db, player, { showScore: published, audience: 'public' })),
   }
 }
 
@@ -172,6 +178,7 @@ export function userPlayerDetail(db, player) {
   const published = Boolean(db.settings?.resultsPublished)
   return {
     resultsPublished: published,
-    player: playerCard(db, player, { showScore: published }),
+    player: playerCard(db, player, { showScore: published, audience: 'public' }),
+    publicMaxMarks: publicMaxMarks(db),
   }
 }

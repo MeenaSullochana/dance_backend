@@ -1,6 +1,6 @@
 import { newId } from '../data/store.js'
 import { criterionKey } from '../services/scoring.service.js'
-import { buildClassificationName, normalizeKey } from '../services/taxonomy.service.js'
+import { buildClassificationName, normalizeKey, parseAgeBounds } from '../services/taxonomy.service.js'
 import { fail, sendState } from '../utils/response.js'
 
 function cleanFormatKeys(value, fallback) {
@@ -88,12 +88,10 @@ export function createTaxonomyController(store) {
   return {
     async createAgeBand(req, res) {
       const name = String(req.body?.name || '').trim()
-      const minAge = Number(req.body?.minAge)
-      const maxAge = Number(req.body?.maxAge)
       if (!name) return fail(res, 400, 'Age band name is required')
-      if (!Number.isInteger(minAge) || !Number.isInteger(maxAge) || minAge < 1 || maxAge < minAge) {
-        return fail(res, 400, 'Enter a valid age range')
-      }
+      const bounds = parseAgeBounds(req.body?.minAge, req.body?.maxAge)
+      if (bounds.error) return fail(res, 400, bounds.error)
+      const { minAge, maxAge } = bounds
       const formatKeys = cleanFormatKeys(req.body?.formatKeys, ['solo'])
       const userId = req.auth.user.id
       await store.update((db) => {
@@ -104,12 +102,10 @@ export function createTaxonomyController(store) {
 
     async updateAgeBand(req, res) {
       const name = String(req.body?.name || '').trim()
-      const minAge = Number(req.body?.minAge)
-      const maxAge = Number(req.body?.maxAge)
       if (!name) return fail(res, 400, 'Age band name is required')
-      if (!Number.isInteger(minAge) || !Number.isInteger(maxAge) || minAge < 1 || maxAge < minAge) {
-        return fail(res, 400, 'Enter a valid age range')
-      }
+      const bounds = parseAgeBounds(req.body?.minAge, req.body?.maxAge)
+      if (bounds.error) return fail(res, 400, bounds.error)
+      const { minAge, maxAge } = bounds
       const userId = req.auth.user.id
       let found = false
       await store.update((db) => {

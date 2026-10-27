@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto'
-import { enterUser } from '../services/access.service.js'
+import { enterAudience, findStaffByEmail } from '../services/access.service.js'
 import { present } from '../utils/present.js'
-import { verifyPassword } from '../utils/passwords.js'
 import { fail, sendState } from '../utils/response.js'
 
 function sessionResponse(res, store, result) {
@@ -13,18 +12,39 @@ function sessionResponse(res, store, result) {
 export function createAuthController(store) {
   return {
     async login(req, res) {
-      if (req.body?.role === 'user') {
-        return sessionResponse(res, store, await enterUser(store, req.body))
+      const audience =
+        req.body?.role === 'user' ||
+        req.body?.audience === true ||
+        Boolean(req.body?.phone || req.body?.mobile) ||
+        (!String(req.body?.email || '').includes('@') && Boolean(String(req.body?.email || '').trim()))
+
+      if (audience) {
+        return sessionResponse(
+          res,
+          store,
+          await enterAudience(store, {
+            phone: req.body?.phone || req.body?.mobile || req.body?.email,
+            name: req.body?.name,
+            club: req.body?.club,
+            register: false,
+          }),
+        )
       }
 
       const email = String(req.body?.email || '').trim().toLowerCase()
       const password = String(req.body?.password || '')
-      const role = req.body?.role
-      const user = store
-        .read()
-        .users.find((item) => item.email && item.email.toLowerCase() === email && verifyPassword(password, item.passwordHash))
-      if (!user) return fail(res, 401, 'Invalid email or password')
-      if (role && user.role !== role) return fail(res, 403, `This account is not a ${role}`)
+      if (!email || !password) return fail(res, 400, 'Enter email and password')
+
+      const user = findStaffByEmail(store.read().users, email, password)
+      if (!user) {
+        const anyMatch = store.read().users.find(
+          (item) => item.email && item.email.toLowerCase() === email,
+        )
+        if (anyMatch?.role === 'user') {
+          return fail(res, 403, 'Audience members sign in with mobile number only')
+        }
+        return fail(res, 401, 'Invalid email or password')
+      }
       if (user.approved === false) return fail(res, 403, 'Your account is waiting for admin approval')
       if (user.active === false) return fail(res, 403, 'This account is deactivated')
 
@@ -36,7 +56,16 @@ export function createAuthController(store) {
     },
 
     async register(req, res) {
-      return sessionResponse(res, store, await enterUser(store, req.body))
+      return sessionResponse(
+        res,
+        store,
+        await enterAudience(store, {
+          phone: req.body?.phone || req.body?.mobile || req.body?.email,
+          name: req.body?.name,
+          club: req.body?.club,
+          register: true,
+        }),
+      )
     },
 
     async logout(req, res) {

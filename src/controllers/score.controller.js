@@ -1,5 +1,5 @@
 import { newId } from '../data/store.js'
-import { buildPodium, validateMarks } from '../services/scoring.service.js'
+import { buildPodium, validateMarks, validatePublicMark } from '../services/scoring.service.js'
 import { fail, sendState } from '../utils/response.js'
 
 export function createScoreController(store) {
@@ -10,15 +10,25 @@ export function createScoreController(store) {
       const player = store.read().players.find((item) => item.id === playerId)
       if (!player) return fail(res, 404, 'Player not found')
       if (store.read().settings?.livePlayerId !== playerId) {
-        return fail(res, 403, 'Marks are open only while this participant is live')
+        return fail(res, 403, 'Voting lines will open only during/ after the performance')
       }
-      const checked = validateMarks(store.read(), req.body?.criteria, player.classificationId)
+      const isAudience = req.auth.user.role === 'user'
+      const judgeId = req.auth.user.id
+      if (isAudience) {
+        const already = store.read().scores.find((score) => score.playerId === playerId && score.judgeId === judgeId)
+        if (already) return fail(res, 403, 'You already voted. Voting cannot be changed.')
+      }
+      const checked = isAudience
+        ? validatePublicMark(store.read(), req.body?.criteria || req.body)
+        : validateMarks(store.read(), req.body?.criteria, player.classificationId)
       if (checked.error) return fail(res, 400, checked.error)
       const { criteria, total } = checked
-      const judgeId = req.auth.user.id
-      const audience = req.auth.user.role === 'user' ? 'public' : 'judge'
+      const audience = isAudience ? 'public' : 'judge'
       await store.update((db) => {
         const existing = db.scores.find((score) => score.playerId === playerId && score.judgeId === judgeId)
+        if (isAudience && existing) {
+          return
+        }
         const entry = {
           id: existing?.id || newId('s'),
           playerId,

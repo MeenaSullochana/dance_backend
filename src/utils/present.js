@@ -10,6 +10,7 @@ function presentUser(user, viewer) {
   if (showPrivate) {
     view.email = user.email || null
     view.phone = user.phone || null
+    view.club = user.club || null
     if (user.registeredAt) view.registeredAt = user.registeredAt
   }
   return view

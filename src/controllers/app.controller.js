@@ -1,9 +1,8 @@
 import { randomBytes } from 'node:crypto'
 import { newId } from '../data/store.js'
-import { enterUser } from '../services/access.service.js'
-import { verifyPassword } from '../utils/passwords.js'
+import { enterAudience, findStaffByEmail } from '../services/access.service.js'
 import { fail } from '../utils/response.js'
-import { splitScores, validateMarks } from '../services/scoring.service.js'
+import { splitScores, validateMarks, validatePublicMark } from '../services/scoring.service.js'
 import {
   judgeHome,
   judgePlayerDetail,
@@ -26,14 +25,12 @@ export function createAppController(store) {
   return {
     async login(req, res) {
       const role = req.body?.role
-      if (role === 'judge') {
+      if (role === 'judge' || role === 'admin') {
         const email = String(req.body?.email || '').trim().toLowerCase()
         const password = String(req.body?.password || '')
-        const user = store.read().users.find(
-          (item) => item.email && item.email.toLowerCase() === email && verifyPassword(password, item.passwordHash),
-        )
+        const user = findStaffByEmail(store.read().users, email, password)
         if (!user) return fail(res, 401, 'Invalid email or password')
-        if (user.role !== 'judge') return fail(res, 403, 'This account is not a judge')
+        if (role === 'judge' && user.role !== 'judge') return fail(res, 403, 'This account is not a judge')
         if (user.active === false) return fail(res, 403, 'This account is deactivated')
         const token = randomBytes(24).toString('hex')
         await store.update((db) => {
@@ -42,11 +39,11 @@ export function createAppController(store) {
         return res.json({ token, user: profile(store.read().users.find((item) => item.id === user.id)) })
       }
       if (role && role !== 'user') return fail(res, 400, 'App login is for judge or user')
-      return userSession(res, store, await enterUser(store, req.body))
+      return userSession(res, store, await enterAudience(store, { ...req.body, register: false }))
     },
 
     async register(req, res) {
-      return userSession(res, store, await enterUser(store, req.body))
+      return userSession(res, store, await enterAudience(store, { ...req.body, register: true }))
     },
 
     async logout(req, res) {
@@ -80,7 +77,7 @@ export function createAppController(store) {
       const player = store.read().players.find((item) => item.id === playerId)
       if (!player) return fail(res, 404, 'Player not found')
       if (store.read().settings?.livePlayerId !== playerId) {
-        return fail(res, 403, 'Marks are open only while this participant is live')
+        return fail(res, 403, 'Voting lines will open only during/ after the performance')
       }
       const checked = validateMarks(store.read(), req.body?.criteria, player.classificationId)
       if (checked.error) return fail(res, 400, checked.error)
@@ -116,16 +113,19 @@ export function createAppController(store) {
       const player = store.read().players.find((item) => item.id === playerId)
       if (!player) return fail(res, 404, 'Player not found')
       if (store.read().settings?.livePlayerId !== playerId) {
-        return fail(res, 403, 'Marks are open only while this participant is live')
+        return fail(res, 403, 'Voting lines will open only during/ after the performance')
       }
-      const checked = validateMarks(store.read(), req.body?.criteria, player.classificationId)
+      const userId = req.auth.user.id
+      const already = store.read().scores.find((score) => score.playerId === playerId && score.judgeId === userId)
+      if (already) return fail(res, 403, 'You already voted. Voting cannot be changed.')
+      const checked = validatePublicMark(store.read(), { ...(req.body?.criteria || {}), mark: req.body?.mark, overall: req.body?.overall ?? req.body?.criteria?.overall })
       if (checked.error) return fail(res, 400, checked.error)
       const { criteria, total, maxTotal } = checked
-      const userId = req.auth.user.id
       await store.update((db) => {
         const existing = db.scores.find((score) => score.playerId === playerId && score.judgeId === userId)
+        if (existing) return
         const entry = {
-          id: existing?.id || newId('s'),
+          id: newId('s'),
           playerId,
           judgeId: userId,
           audience: 'public',
@@ -134,7 +134,7 @@ export function createAppController(store) {
           comment,
           createdAt: new Date().toISOString(),
         }
-        db.scores = existing ? db.scores.map((score) => (score.id === existing.id ? entry : score)) : [...db.scores, entry]
+        db.scores = [...db.scores, entry]
       })
       const db = store.read()
       const split = splitScores(db, playerId)
