@@ -225,7 +225,7 @@ function seedFields(db, classificationId) {
 
 export function ensureCategoryRules(db) {
   ensureTaxonomy(db)
-  if (!db.settings) db.settings = { resultsPublished: false, livePlayerId: null, categoryDefaultsApplied: false }
+  if (!db.settings) db.settings = { resultsPublished: false, livePlayerId: null, votingOpen: false, categoryDefaultsApplied: false }
   let changed = false
   const formats = db.formats || []
   const formatByKey = (key) => formats.find((item) => item.key === key)

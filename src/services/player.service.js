@@ -42,18 +42,105 @@ function cleanPhoto(value) {
   return value
 }
 
-export function assignArrival(db, player) {
-  if (!player.classificationId) return { error: 'Add the age first so this entry is placed in a category' }
+const ARRIVAL_LETTER = { solo: 'S', couple: 'C', group: 'G', single: 'S' }
+
+export function playerFormatKey(player) {
+  return player?.formatKey || (player?.type === 'group' ? 'group' : player?.type === 'couple' ? 'couple' : 'solo')
+}
+
+export function canGoLive(player) {
+  return Boolean(player?.arrived) && player?.pendriveStatus === 'received'
+}
+
+function nextNumber(values) {
+  const used = values.filter((value) => Number.isInteger(value) && value > 0)
+  return (used.length ? Math.max(...used) : 0) + 1
+}
+
+export function assignRegisteredId(db, player) {
+  if (!player.classificationId) return { registeredId: player.registeredId || null }
   const category = (db.classifications || []).find((item) => item.id === player.classificationId)
   const prefix = String(category?.prefix || '').trim().toUpperCase()
-  if (!prefix) return { error: `Set an ID prefix for ${category?.name || 'this category'} in Classifications` }
-  if (player.arrivalNo && !player.reissue) return { arrivalNo: player.arrivalNo }
-  const used = (db.players || [])
-    .filter((item) => item.arrivalNo && String(item.arrivalNo).toUpperCase().startsWith(`${prefix}-`))
-    .map((item) => Number(String(item.arrivalNo).slice(prefix.length + 1)))
-    .filter((value) => Number.isInteger(value))
-  const next = (used.length ? Math.max(...used) : 0) + 1
-  return { arrivalNo: `${prefix}-${String(next).padStart(2, '0')}` }
+  if (player.registeredId && !player.reissue) {
+    if (!prefix) return { registeredId: player.registeredId }
+    const current = String(player.registeredId).toUpperCase()
+    if (current.startsWith(prefix) && /^\d+$/.test(current.slice(prefix.length))) {
+      return { registeredId: player.registeredId }
+    }
+  }
+  if (!prefix) {
+    return { error: `Set a Registered ID prefix for ${category?.name || 'this category'} in Classifications (e.g. SK, SY, SA)` }
+  }
+  const used = (db.players || []).map((item) => {
+    if (item.id && player.id && item.id === player.id) return null
+    const value = String(item.registeredId || '').toUpperCase()
+    if (!value.startsWith(prefix)) return null
+    const n = Number(value.slice(prefix.length))
+    return Number.isInteger(n) ? n : null
+  })
+  return { registeredId: `${prefix}${nextNumber(used)}` }
+}
+
+export function assignArrival(db, player) {
+  const letter = ARRIVAL_LETTER[playerFormatKey(player)] || 'S'
+  if (player.arrivalNo && !player.reissue) {
+    const current = String(player.arrivalNo).toUpperCase()
+    if (current.startsWith(letter) && /^\d+$/.test(current.slice(1))) {
+      return { arrivalNo: player.arrivalNo }
+    }
+  }
+  const used = (db.players || []).map((item) => {
+    if (item.id && player.id && item.id === player.id) return null
+    if (!item.arrived) return null
+    const value = String(item.arrivalNo || '').toUpperCase()
+    if (!value.startsWith(letter) || !/^\d+$/.test(value.slice(1))) return null
+    return Number(value.slice(1))
+  })
+  return { arrivalNo: `${letter}${nextNumber(used)}` }
+}
+
+export function ensureRegisteredIds(state) {
+  let changed = false
+  for (const player of state.players || []) {
+    if (player.registeredId || !player.classificationId) continue
+    const assigned = assignRegisteredId(state, { ...player, reissue: true })
+    if (assigned.error || !assigned.registeredId) continue
+    player.registeredId = assigned.registeredId
+    changed = true
+  }
+  return changed
+}
+
+function arrivalMatches(value, letter) {
+  const current = String(value || '').toUpperCase()
+  return current.startsWith(letter) && /^\d+$/.test(current.slice(letter.length))
+}
+
+export function ensureArrivalIds(state) {
+  let changed = false
+  for (const player of state.players || []) {
+    if (!player.arrived) continue
+    const letter = ARRIVAL_LETTER[playerFormatKey(player)] || 'S'
+    if (arrivalMatches(player.arrivalNo, letter)) continue
+    const assigned = assignArrival(state, { ...player, arrivalNo: null, reissue: true })
+    if (!assigned.arrivalNo) continue
+    player.arrivalNo = assigned.arrivalNo
+    changed = true
+  }
+  return changed
+}
+
+export function ensureLiveEligibility(state) {
+  const liveId = state.settings?.livePlayerId
+  if (!liveId) {
+    if (!state.settings?.votingOpen) return false
+    state.settings = { ...state.settings, votingOpen: false }
+    return true
+  }
+  const player = (state.players || []).find((item) => item.id === liveId)
+  if (player && canGoLive(player)) return false
+  state.settings = { ...state.settings, livePlayerId: null, votingOpen: false }
+  return true
 }
 
 export function buildPlayerPayload(db, body) {

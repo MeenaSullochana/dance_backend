@@ -7,6 +7,13 @@ function presentUser(user, viewer) {
     active: user.active !== false,
     approved: user.approved !== false,
   }
+  if (user.role === 'judge') {
+    view.panelRole = user.panelRole || ''
+    view.photo = user.photo || null
+    view.imageKey = user.imageKey || null
+    view.sortOrder = Number(user.sortOrder) || 0
+    view.showOnPanel = Boolean(user.showOnPanel)
+  }
   if (showPrivate) {
     view.email = user.email || null
     view.phone = user.phone || null
@@ -29,5 +36,7 @@ export function present(db, viewer) {
     classifications: db.classifications || [],
     markCriteria: db.markCriteria || [],
     categoryParameters: db.categoryParameters || [],
+    panelJudges: db.panelJudges || [],
+    clubLeaders: db.clubLeaders || [],
   }
 }

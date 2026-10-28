@@ -10,6 +10,7 @@ import { importRoutes } from './import.routes.js'
 import { playerRoutes } from './players.routes.js'
 import { scoreRoutes } from './scores.routes.js'
 import { settingsRoutes } from './settings.routes.js'
+import { siteContentRoutes } from './siteContent.routes.js'
 import { taxonomyRoutes } from './taxonomy.routes.js'
 
 export function createApiRouter(store) {
@@ -30,6 +31,7 @@ export function createApiRouter(store) {
   router.use('/mark-criteria', criteriaRoutes(store))
   router.use('/settings', settingsRoutes(store))
   router.use('/import', importRoutes(store))
+  router.use(siteContentRoutes(store))
   router.use(taxonomyRoutes(store))
 
   router.post('/reset', requireRole('admin'), settings.reset)

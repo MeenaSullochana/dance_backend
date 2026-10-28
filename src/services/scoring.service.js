@@ -48,7 +48,24 @@ export function scoringMetaFrom(db, classificationId) {
     maxTotal: maxTotalOf(criteria),
     passPercent: PASS_PERCENT,
     livePlayerId: db.settings?.livePlayerId || null,
+    votingOpen: Boolean(db.settings?.votingOpen) && Boolean(db.settings?.livePlayerId),
   }
+}
+
+export const AUDIENCE_ONCE = "Once you submit, you can't redo the voting"
+
+export function canSubmitMarks(db, playerId) {
+  return Boolean(db.settings?.votingOpen) && db.settings?.livePlayerId === playerId
+}
+
+export function marksBlockedReason(db, playerId) {
+  if (db.settings?.livePlayerId !== playerId) {
+    return 'Voting lines will open only during/ after the performance'
+  }
+  if (!db.settings?.votingOpen) {
+    return 'Voting has not started yet'
+  }
+  return null
 }
 
 export function scoreAudience(score, users) {
@@ -132,8 +149,9 @@ export function ensureMarkCriteria(state) {
   if (!Array.isArray(state.markCriteria) || !state.markCriteria.length) {
     state.markCriteria = defaultMarkCriteria()
   }
-  if (!state.settings) state.settings = { resultsPublished: false, livePlayerId: null }
+  if (!state.settings) state.settings = { resultsPublished: false, livePlayerId: null, votingOpen: false }
   if (state.settings.livePlayerId === undefined) state.settings.livePlayerId = null
+  if (state.settings.votingOpen === undefined) state.settings.votingOpen = false
   if (!Number(state.settings.publicMaxMarks)) state.settings.publicMaxMarks = 10
 }
 

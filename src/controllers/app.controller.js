@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { newId } from '../data/store.js'
 import { enterAudience, findStaffByEmail } from '../services/access.service.js'
 import { fail } from '../utils/response.js'
-import { splitScores, validateMarks, validatePublicMark } from '../services/scoring.service.js'
+import { AUDIENCE_ONCE, marksBlockedReason, splitScores, validateMarks, validatePublicMark } from '../services/scoring.service.js'
 import {
   judgeHome,
   judgePlayerDetail,
@@ -39,11 +39,15 @@ export function createAppController(store) {
         return res.json({ token, user: profile(store.read().users.find((item) => item.id === user.id)) })
       }
       if (role && role !== 'user') return fail(res, 400, 'App login is for judge or user')
-      return userSession(res, store, await enterAudience(store, { ...req.body, register: false }))
+      return userSession(res, store, await enterAudience(store, req.body))
     },
 
     async register(req, res) {
-      return userSession(res, store, await enterAudience(store, { ...req.body, register: true }))
+      return userSession(res, store, await enterAudience(store, req.body))
+    },
+
+    async signin(req, res) {
+      return userSession(res, store, await enterAudience(store, req.body))
     },
 
     async logout(req, res) {
@@ -76,9 +80,8 @@ export function createAppController(store) {
       const comment = String(req.body?.comment || '').slice(0, 500)
       const player = store.read().players.find((item) => item.id === playerId)
       if (!player) return fail(res, 404, 'Player not found')
-      if (store.read().settings?.livePlayerId !== playerId) {
-        return fail(res, 403, 'Voting lines will open only during/ after the performance')
-      }
+      const blocked = marksBlockedReason(store.read(), playerId)
+      if (blocked) return fail(res, 403, blocked)
       const checked = validateMarks(store.read(), req.body?.criteria, player.classificationId)
       if (checked.error) return fail(res, 400, checked.error)
       const { criteria, total, maxTotal } = checked
@@ -112,12 +115,11 @@ export function createAppController(store) {
       const comment = String(req.body?.comment || '').slice(0, 500)
       const player = store.read().players.find((item) => item.id === playerId)
       if (!player) return fail(res, 404, 'Player not found')
-      if (store.read().settings?.livePlayerId !== playerId) {
-        return fail(res, 403, 'Voting lines will open only during/ after the performance')
-      }
+      const blocked = marksBlockedReason(store.read(), playerId)
+      if (blocked) return fail(res, 403, blocked)
       const userId = req.auth.user.id
       const already = store.read().scores.find((score) => score.playerId === playerId && score.judgeId === userId)
-      if (already) return fail(res, 403, 'You already voted. Voting cannot be changed.')
+      if (already) return fail(res, 403, AUDIENCE_ONCE)
       const checked = validatePublicMark(store.read(), { ...(req.body?.criteria || {}), mark: req.body?.mark, overall: req.body?.overall ?? req.body?.criteria?.overall })
       if (checked.error) return fail(res, 400, checked.error)
       const { criteria, total, maxTotal } = checked
@@ -143,7 +145,9 @@ export function createAppController(store) {
         score: { playerId, criteria, total, comment, maxTotal },
         publicAverage: Number(split.publicAverage.toFixed(1)),
         publicCount: split.publicScores.length,
-        player: userPlayerDetail(db, db.players.find((item) => item.id === playerId)),
+        player: userPlayerDetail(db, db.players.find((item) => item.id === playerId), req.auth.user),
+        alreadyVoted: true,
+        voteOnceMessage: AUDIENCE_ONCE,
       })
     },
 
@@ -155,7 +159,7 @@ export function createAppController(store) {
     userPlayer(req, res) {
       const player = store.read().players.find((item) => item.id === req.params.id)
       if (!player) return fail(res, 404, 'Player not found')
-      res.json(userPlayerDetail(store.read(), player))
+      res.json(userPlayerDetail(store.read(), player, req.auth.user))
     },
   }
 }

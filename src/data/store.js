@@ -2,9 +2,11 @@ import {
   AgeBand,
   CategoryParameter,
   Classification,
+  ClubLeader,
   Format,
   LegacyAppData,
   MarkCriterion,
+  PanelJudge,
   ParticipantType,
   Player,
   Score,
@@ -12,7 +14,9 @@ import {
   Settings,
   User,
 } from '../models/index.js'
+import { ensureArrivalIds, ensureLiveEligibility, ensureRegisteredIds } from '../services/player.service.js'
 import { ensureMarkCriteria } from '../services/scoring.service.js'
+import { ensureSitePeople } from '../services/siteContent.service.js'
 import { ensureCategoryRules, ensureTaxonomy } from '../services/taxonomy.service.js'
 import { createSeed } from './seed.js'
 
@@ -42,6 +46,7 @@ function normalizePlayer(player) {
     pendriveStatus: player.pendriveStatus || null,
     arrived: Boolean(player.arrived),
     arrivalNo: player.arrivalNo || null,
+    registeredId: player.registeredId || null,
     photo: player.photo ?? null,
     winner: Boolean(player.winner),
     ...player,
@@ -78,20 +83,35 @@ async function replaceCollection(Model, items) {
 }
 
 async function loadFromCollections() {
-  const [users, players, scores, settingsDoc, sessions, ageBands, participantTypes, formats, classifications, markCriteria, categoryParameters] =
-    await Promise.all([
-      User.find().lean(),
-      Player.find().lean(),
-      Score.find().lean(),
-      Settings.findById('main').lean(),
-      Session.find().lean(),
-      AgeBand.find().lean(),
-      ParticipantType.find().lean(),
-      Format.find().lean(),
-      Classification.find().lean(),
-      MarkCriterion.find().lean(),
-      CategoryParameter.find().lean(),
-    ])
+  const [
+    users,
+    players,
+    scores,
+    settingsDoc,
+    sessions,
+    ageBands,
+    participantTypes,
+    formats,
+    classifications,
+    markCriteria,
+    categoryParameters,
+    panelJudges,
+    clubLeaders,
+  ] = await Promise.all([
+    User.find().lean(),
+    Player.find().lean(),
+    Score.find().lean(),
+    Settings.findById('main').lean(),
+    Session.find().lean(),
+    AgeBand.find().lean(),
+    ParticipantType.find().lean(),
+    Format.find().lean(),
+    Classification.find().lean(),
+    MarkCriterion.find().lean(),
+    CategoryParameter.find().lean(),
+    PanelJudge.find().lean(),
+    ClubLeader.find().lean(),
+  ])
 
   const sessionMap = {}
   for (const session of sessions) {
@@ -106,11 +126,14 @@ async function loadFromCollections() {
       ? {
           resultsPublished: Boolean(settingsDoc.resultsPublished),
           livePlayerId: settingsDoc.livePlayerId || null,
+          votingOpen: Boolean(settingsDoc.votingOpen),
           categoryDefaultsApplied: Boolean(settingsDoc.categoryDefaultsApplied),
           podium: settingsDoc.podium || null,
           publicMaxMarks: Number(settingsDoc.publicMaxMarks) || 10,
+          sitePeopleSeeded: Boolean(settingsDoc.sitePeopleSeeded),
+          judgeProfilesSeeded: Boolean(settingsDoc.judgeProfilesSeeded),
         }
-      : { resultsPublished: false, livePlayerId: null, categoryDefaultsApplied: false, podium: null, publicMaxMarks: 10 },
+      : { resultsPublished: false, livePlayerId: null, votingOpen: false, categoryDefaultsApplied: false, podium: null, publicMaxMarks: 10, sitePeopleSeeded: false, judgeProfilesSeeded: false },
     sessions: sessionMap,
     ageBands: ageBands.map(withId),
     participantTypes: participantTypes.map(withId),
@@ -118,12 +141,18 @@ async function loadFromCollections() {
     classifications: classifications.map(withId),
     markCriteria: markCriteria.map(withId),
     categoryParameters: categoryParameters.map(withId),
+    panelJudges: panelJudges.map(withId),
+    clubLeaders: clubLeaders.map(withId),
   }
   ensureTaxonomy(state)
   const missingCriteria = !state.markCriteria.length
   ensureMarkCriteria(state)
   const rulesChanged = ensureCategoryRules(state)
-  if (missingCriteria || rulesChanged) await saveCollections(state)
+  const peopleChanged = ensureSitePeople(state)
+  const idsChanged = ensureRegisteredIds(state)
+  const arrivalChanged = ensureArrivalIds(state)
+  const liveChanged = ensureLiveEligibility(state)
+  if (missingCriteria || rulesChanged || peopleChanged || idsChanged || arrivalChanged || liveChanged) await saveCollections(state)
   return state
 }
 
@@ -143,9 +172,12 @@ async function saveCollections(state) {
         _id: 'main',
         resultsPublished: Boolean(state.settings?.resultsPublished),
         livePlayerId: state.settings?.livePlayerId || null,
+        votingOpen: Boolean(state.settings?.votingOpen) && Boolean(state.settings?.livePlayerId),
         categoryDefaultsApplied: Boolean(state.settings?.categoryDefaultsApplied),
         podium: state.settings?.podium || null,
         publicMaxMarks: Number(state.settings?.publicMaxMarks) || 10,
+        sitePeopleSeeded: Boolean(state.settings?.sitePeopleSeeded),
+        judgeProfilesSeeded: Boolean(state.settings?.judgeProfilesSeeded),
       },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     ),
@@ -156,6 +188,8 @@ async function saveCollections(state) {
     replaceCollection(Classification, state.classifications || []),
     replaceCollection(MarkCriterion, state.markCriteria || []),
     replaceCollection(CategoryParameter, state.categoryParameters || []),
+    replaceCollection(PanelJudge, state.panelJudges || []),
+    replaceCollection(ClubLeader, state.clubLeaders || []),
   ])
 }
 
@@ -222,6 +256,7 @@ export async function createStore() {
       ensureTaxonomy(db)
       ensureMarkCriteria(db)
       ensureCategoryRules(db)
+      ensureSitePeople(db)
       db = {
         ...db,
         players: (db.players || []).map(normalizePlayer),

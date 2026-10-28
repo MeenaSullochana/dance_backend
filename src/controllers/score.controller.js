@@ -1,5 +1,5 @@
 import { newId } from '../data/store.js'
-import { buildPodium, validateMarks, validatePublicMark } from '../services/scoring.service.js'
+import { AUDIENCE_ONCE, buildPodium, marksBlockedReason, validateMarks, validatePublicMark } from '../services/scoring.service.js'
 import { fail, sendState } from '../utils/response.js'
 
 export function createScoreController(store) {
@@ -9,14 +9,13 @@ export function createScoreController(store) {
       const comment = String(req.body?.comment || '').slice(0, 500)
       const player = store.read().players.find((item) => item.id === playerId)
       if (!player) return fail(res, 404, 'Player not found')
-      if (store.read().settings?.livePlayerId !== playerId) {
-        return fail(res, 403, 'Voting lines will open only during/ after the performance')
-      }
+      const blocked = marksBlockedReason(store.read(), playerId)
+      if (blocked) return fail(res, 403, blocked)
       const isAudience = req.auth.user.role === 'user'
       const judgeId = req.auth.user.id
       if (isAudience) {
         const already = store.read().scores.find((score) => score.playerId === playerId && score.judgeId === judgeId)
-        if (already) return fail(res, 403, 'You already voted. Voting cannot be changed.')
+        if (already) return fail(res, 403, AUDIENCE_ONCE)
       }
       const checked = isAudience
         ? validatePublicMark(store.read(), req.body?.criteria || req.body)

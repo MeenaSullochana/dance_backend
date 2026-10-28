@@ -8,6 +8,7 @@ export function authRoutes(store) {
 
   router.post('/login', asyncRoute(auth.login))
   router.post('/register', asyncRoute(auth.register))
+  router.post('/signin', asyncRoute(auth.signin))
   router.post('/logout', asyncRoute(auth.logout))
 
   return router

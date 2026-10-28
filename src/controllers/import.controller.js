@@ -1,4 +1,5 @@
 import { newId } from '../data/store.js'
+import { assignRegisteredId } from '../services/player.service.js'
 import { previewGoogleFormRows, rowsToPlayers } from '../services/import.service.js'
 import { present } from '../utils/present.js'
 import { fail } from '../utils/response.js'
@@ -35,11 +36,17 @@ export function createImportController(store) {
         const userId = req.auth.user.id
         await store.update((db) => {
           const startChest = Math.max(100, ...db.players.map((player) => player.chestNo || 0))
-          const players = rowsToPlayers(ready, startChest).map((player) => ({
-            id: newId(player.type === 'group' ? 'g' : 'p'),
-            ...player,
-          }))
-          db.players.push(...players)
+          const players = rowsToPlayers(ready, startChest)
+          for (const player of players) {
+            const registered = assignRegisteredId(db, player)
+            db.players.push({
+              id: newId(player.type === 'group' ? 'g' : 'p'),
+              ...player,
+              registeredId: registered.registeredId || null,
+              arrived: false,
+              arrivalNo: null,
+            })
+          }
         })
         const state = present(store.read(), store.read().users.find((user) => user.id === userId))
         res.json({

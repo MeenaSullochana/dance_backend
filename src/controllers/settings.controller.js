@@ -16,6 +16,10 @@ export function createSettingsController(store) {
         if (req.body?.resultsPublished !== undefined) next.resultsPublished = Boolean(req.body.resultsPublished)
         if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'livePlayerId')) {
           next.livePlayerId = req.body.livePlayerId || null
+          if (!next.livePlayerId) next.votingOpen = false
+        }
+        if (req.body?.votingOpen !== undefined) {
+          next.votingOpen = Boolean(req.body.votingOpen) && Boolean(next.livePlayerId)
         }
         if (publicMaxMarks !== null) next.publicMaxMarks = publicMaxMarks
         db.settings = next

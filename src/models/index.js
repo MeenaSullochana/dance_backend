@@ -14,6 +14,11 @@ const UserSchema = new mongoose.Schema(
     active: { type: Boolean, default: true },
     approved: { type: Boolean, default: true },
     registeredAt: String,
+    panelRole: { type: String, default: '' },
+    photo: { type: String, default: null },
+    imageKey: { type: String, default: null },
+    sortOrder: { type: Number, default: 0 },
+    showOnPanel: { type: Boolean, default: false },
   },
   { ...base, collection: 'users' },
 )
@@ -31,6 +36,7 @@ const PlayerSchema = new mongoose.Schema(
     pendriveStatus: { type: String, default: null },
     arrived: { type: Boolean, default: false },
     arrivalNo: { type: String, default: null },
+    registeredId: { type: String, default: null },
     photo: { type: String, default: null },
     chestNo: Number,
     winner: { type: Boolean, default: false },
@@ -67,9 +73,12 @@ const SettingsSchema = new mongoose.Schema(
     _id: { type: String, default: 'main' },
     resultsPublished: { type: Boolean, default: false },
     livePlayerId: { type: String, default: null },
+    votingOpen: { type: Boolean, default: false },
     categoryDefaultsApplied: { type: Boolean, default: false },
     podium: { type: mongoose.Schema.Types.Mixed, default: null },
     publicMaxMarks: { type: Number, default: 10 },
+    sitePeopleSeeded: { type: Boolean, default: false },
+    judgeProfilesSeeded: { type: Boolean, default: false },
   },
   { ...base, collection: 'settings' },
 )
@@ -144,6 +153,35 @@ const ClassificationSchema = new mongoose.Schema(
   { ...base, collection: 'classifications' },
 )
 
+const PanelJudgeSchema = new mongoose.Schema(
+  {
+    _id: { type: String },
+    name: String,
+    role: { type: String, default: '' },
+    photo: { type: String, default: null },
+    imageKey: { type: String, default: null },
+    sortOrder: { type: Number, default: 0 },
+    active: { type: Boolean, default: true },
+  },
+  { ...base, collection: 'panel_judges' },
+)
+
+const ClubLeaderSchema = new mongoose.Schema(
+  {
+    _id: { type: String },
+    name: String,
+    title: { type: String, default: '' },
+    role: { type: String, default: '' },
+    lines: { type: [String], default: [] },
+    photo: { type: String, default: null },
+    imageKey: { type: String, default: null },
+    icon: { type: String, default: 'users' },
+    sortOrder: { type: Number, default: 0 },
+    active: { type: Boolean, default: true },
+  },
+  { ...base, collection: 'club_leaders' },
+)
+
 const CategoryParameterSchema = new mongoose.Schema(
   {
     _id: { type: String },
@@ -189,5 +227,7 @@ export const Classification =
   mongoose.models.Classification || mongoose.model('Classification', ClassificationSchema)
 export const CategoryParameter =
   mongoose.models.CategoryParameter || mongoose.model('CategoryParameter', CategoryParameterSchema)
+export const PanelJudge = mongoose.models.PanelJudge || mongoose.model('PanelJudge', PanelJudgeSchema)
+export const ClubLeader = mongoose.models.ClubLeader || mongoose.model('ClubLeader', ClubLeaderSchema)
 export const LegacyAppData =
   mongoose.models.LegacyAppData || mongoose.model('LegacyAppData', LegacyAppDataSchema)

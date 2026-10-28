@@ -45,22 +45,14 @@
               }
             },
             {
-              "name": "Login User",
+              "name": "Sign in User",
               "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "if (data.token) pm.collectionVariables.set('token', data.token);"] } }],
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@dance.com\",\n  \"password\": \"user123\",\n  \"role\": \"user\"\n}" },
-                "url": "{{baseUrl}}/api/auth/login"
-              }
-            },
-            {
-              "name": "Register User",
-              "request": {
-                "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"name\": \"New User\",\n  \"email\": \"newuser@dance.com\",\n  \"password\": \"user123\",\n  \"role\": \"user\"\n}" },
-                "url": "{{baseUrl}}/api/auth/register"
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"App User\",\n  \"phone\": \"9876543210\"\n}" },
+                "url": "{{baseUrl}}/api/auth/signin",
+                "description": "Audience sign in. Existing mobile opens that account. New mobile creates a record."
               }
             },
             {
@@ -327,23 +319,14 @@
               }
             },
             {
-              "name": "App Login User",
+              "name": "App Sign in User",
               "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const data = pm.response.json();", "if (data.token) pm.collectionVariables.set('token', data.token);"] } }],
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@dance.com\",\n  \"password\": \"user123\",\n  \"role\": \"user\"\n}" },
-                "url": "{{baseUrl}}/api/app/auth/login"
-              }
-            },
-            {
-              "name": "App Register User",
-              "request": {
-                "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"name\": \"App User\",\n  \"phone\": \"9876543210\",\n  \"password\": \"user123\"\n}" },
-                "url": "{{baseUrl}}/api/app/auth/register",
-                "description": "User login and register are the same. New email or mobile is approved immediately. The same password signs in. A different password returns 409 Already registered."
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"App User\",\n  \"phone\": \"9876543210\"\n}" },
+                "url": "{{baseUrl}}/api/app/auth/signin",
+                "description": "Audience sign in. Existing mobile opens that account. New mobile creates a record. Login and register do the same for users."
               }
             },
             {

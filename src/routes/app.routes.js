@@ -8,6 +8,7 @@ export function appRoutes(store) {
 
   router.post('/auth/login', app.login)
   router.post('/auth/register', app.register)
+  router.post('/auth/signin', app.signin)
   router.post('/auth/logout', app.logout)
   router.get('/me', requireRole('judge', 'user'), app.me)
 

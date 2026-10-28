@@ -26,7 +26,6 @@ export function createAuthController(store) {
             phone: req.body?.phone || req.body?.mobile || req.body?.email,
             name: req.body?.name,
             club: req.body?.club,
-            register: false,
           }),
         )
       }
@@ -63,7 +62,18 @@ export function createAuthController(store) {
           phone: req.body?.phone || req.body?.mobile || req.body?.email,
           name: req.body?.name,
           club: req.body?.club,
-          register: true,
+        }),
+      )
+    },
+
+    async signin(req, res) {
+      return sessionResponse(
+        res,
+        store,
+        await enterAudience(store, {
+          phone: req.body?.phone || req.body?.mobile || req.body?.email,
+          name: req.body?.name,
+          club: req.body?.club,
         }),
       )
     },

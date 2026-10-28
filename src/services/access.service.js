@@ -30,7 +30,7 @@ export function findStaffByEmail(users, email, password) {
   )
 }
 
-/** Audience: mobile number is the password. Signup needs name; club is optional. */
+/** Audience: one sign-in. Existing mobile opens that record; new mobile creates one. */
 export async function enterAudience(store, body) {
   const id = readPhone(body)
   if (id.error) return { status: 400, error: id.error }
@@ -38,19 +38,13 @@ export async function enterAudience(store, body) {
   const password = phone
   const name = String(body?.name || '').trim().slice(0, 80)
   const club = String(body?.club || '').trim().slice(0, 80) || null
-  const creating = Boolean(body?.name) || body?.register === true
 
   const known = findByPhone(store.read().users, phone)
   if (known) {
     if (known.active === false) return { status: 403, error: 'This account is deactivated' }
-    if (known.role !== 'user' || !verifyPassword(password, known.passwordHash)) {
-      return { status: 409, error: 'Already registered' }
-    }
-    if (creating) return { status: 409, error: 'Already registered' }
-  } else if (!creating) {
-    return { status: 404, error: 'Not registered. Sign up with your name and mobile number.' }
+    if (known.role !== 'user') return { status: 409, error: 'This mobile number is already in use' }
   } else if (!name) {
-    return { status: 400, error: 'Enter your name to sign up' }
+    return { status: 400, error: 'Enter your name to sign in' }
   }
 
   const outcome = { status: 200 }
@@ -62,17 +56,14 @@ export async function enterAudience(store, body) {
         outcome.error = 'This account is deactivated'
         return
       }
-      if (existing.role !== 'user' || !verifyPassword(password, existing.passwordHash)) {
+      if (existing.role !== 'user') {
         outcome.status = 409
-        outcome.error = 'Already registered'
-        return
-      }
-      if (creating) {
-        outcome.status = 409
-        outcome.error = 'Already registered'
+        outcome.error = 'This mobile number is already in use'
         return
       }
       existing.approved = true
+      if (name && !existing.name) existing.name = name
+      if (club && !existing.club) existing.club = club
       const token = randomBytes(24).toString('hex')
       db.sessions[token] = existing.id
       outcome.status = 200
@@ -84,7 +75,7 @@ export async function enterAudience(store, body) {
 
     if (!name) {
       outcome.status = 400
-      outcome.error = 'Enter your name to sign up'
+      outcome.error = 'Enter your name to sign in'
       return
     }
 

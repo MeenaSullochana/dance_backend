@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Dance of District - User App",
-    "description": "Mobile API for the audience / user app. Base path is `/api/app`.\n\n## Setup\n1. Import this collection.\n2. Import `Dance-of-District-Local.postman_environment.json`, or leave `baseUrl` as `http://localhost:7000`.\n3. Run **Login**. The token is saved. **Home** then saves `playerId` from the live participant, or the first player in the list.\n\n## Login\n`POST {{baseUrl}}/api/app/auth/login`\n\n```json\n{ \"email\": \"user@dance.com\", \"password\": \"user123\", \"role\": \"user\" }\n```\n\nLogin and register do the same thing for a user. Send an email or a 10 digit mobile number, plus a password of at least 4 characters. `phone` or `mobile` is accepted as well as `email`. A new person is saved as an approved user and gets a token immediately. The same number or email with the same password returns a token again. A different password returns `409` with `Already registered`. An admin can still create a user from the website.\n\n`200` when the account already exists and the password matches. `201` when the account is created.\n\n```json\n{ \"email\": \"user@dance.com\", \"password\": \"user123\", \"role\": \"user\" }\n```\n\n```json\n{ \"phone\": \"9876543210\", \"password\": \"user123\", \"name\": \"App User\" }\n```\n\n`200` or `201`:\n```json\n{\n  \"token\": \"<hex>\",\n  \"created\": false,\n  \"user\": { \"id\": \"m1\", \"name\": \"Neha Verma\", \"email\": \"user@dance.com\", \"phone\": null, \"role\": \"user\", \"active\": true, \"approved\": true }\n}\n```\n\nLater requests send `Authorization: Bearer {{token}}`.\n\n## Screen flow\n1. **Home** lists one format: `type=single` (solo), `couple`, or `group`.\n2. `livePlayer` is who is on stage. **Give marks** is allowed only for that id.\n3. Each mark is a whole number from **1** to that field's `maxMarks`. 0 is rejected.\n4. The public average is the sum of each user's total divided by how many users marked. Example: five users, and one total is 20, then average = (20 + the other four totals) / 5.\n5. Scores, status, and winners stay hidden until the admin publishes results. After that, `score.average` is the **judge** average. `score.publicAverage` and `score.publicCount` are the public marks. Winners are chosen from the judge average, not the public average.\n6. **Me** reloads the profile. **Logout** drops the token.\n\n## Errors\n- `401` Please log in, or a judge email/password does not match.\n- `403` Wrong role, account off, or marks sent when the participant is not live.\n- `409` Already registered. The email or mobile number exists and the password is different.\n- `404` Player not found.\n- `400` A mark is missing or not from 1 to maxMarks.\n\nDemo user: `user@dance.com` / `user123`.",
+    "description": "Mobile API for the audience / user app. Base path is `/api/app`.\n\n## Setup\n1. Import this collection.\n2. Import `Dance-of-District-Local.postman_environment.json`, or leave `baseUrl` as `http://localhost:7000`.\n3. Run **Sign in**. The token is saved. **Home** then saves `playerId` from the live participant, or the first player in the list.\n\n## Sign in\n`POST {{baseUrl}}/api/app/auth/signin`\n\nAudience uses one sign-in. Send name and a 10 digit mobile number. If that mobile already exists, the existing user is returned. If it is new, a record is created. `/auth/login` and `/auth/register` do the same for users.\n\n```json\n{ \"name\": \"App User\", \"phone\": \"9876543210\" }\n```\n\n`200` when the mobile already exists. `201` when a new record is created.\n\n```json\n{\n  \"token\": \"<hex>\",\n  \"created\": false,\n  \"user\": { \"id\": \"m1\", \"name\": \"App User\", \"email\": null, \"phone\": \"9876543210\", \"role\": \"user\", \"active\": true, \"approved\": true }\n}\n```\n\nLater requests send `Authorization: Bearer {{token}}`.\n\n## Screen flow\n1. **Home** lists one format: `type=single` (solo), `couple`, or `group`.\n2. `livePlayer` with `performing: true` means they are on stage. Show performing only. Do not show the mark form until `votingOpen` / `canVote` is true.\n3. After submit, `alreadyVoted` is true and `voteOnceMessage` is: Once you submit, you can't redo the voting.\n4. Each mark is a whole number from **1** to that field's `maxMarks`. 0 is rejected.\n5. Scores stay hidden until the admin publishes results.\n6. **Me** reloads the profile. **Logout** drops the token.\n\n## Errors\n- `401` Please sign in.\n- `403` Voting has not started yet, or Once you submit, you can't redo the voting.\n- `404` Player not found.\n- `400` A mark is missing or not from 1 to maxMarks.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,20 +11,7 @@
   ],
   "item": [
     {
-      "name": "Register",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"name\": \"App User\",\n  \"phone\": \"9876543210\",\n  \"password\": \"user123\"\n}"
-        },
-        "url": "{{baseUrl}}/api/app/auth/register",
-        "description": "Same as user login. A new mobile number or email is saved as an approved user and a token is returned. The same number and password logs in. A different password returns 409 Already registered. Send email or phone."
-      }
-    },
-    {
-      "name": "Login",
+      "name": "Sign in",
       "event": [
         {
           "listen": "test",
@@ -32,8 +19,8 @@
             "type": "text/javascript",
             "exec": [
               "const data = pm.response.json();",
-              "pm.test('User login returns a token', function () {",
-              "  pm.response.to.have.status(200);",
+              "pm.test('User sign in returns a token', function () {",
+              "  pm.expect([200, 201]).to.include(pm.response.code);",
               "  pm.expect(data.token).to.be.a('string').and.not.empty;",
               "  pm.expect(data.user.role).to.eql('user');",
               "});",
@@ -47,10 +34,10 @@
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"user@dance.com\",\n  \"password\": \"user123\",\n  \"role\": \"user\"\n}"
+          "raw": "{\n  \"name\": \"App User\",\n  \"phone\": \"9876543210\"\n}"
         },
-        "url": "{{baseUrl}}/api/app/auth/login",
-        "description": "Same as register for role user. An existing user with the same email or mobile and password gets a token. A new email or mobile is created and logged in. A different password returns 409 Already registered. Judge login still uses role judge and does not create an account."
+        "url": "{{baseUrl}}/api/app/auth/signin",
+        "description": "Audience sign in. If the mobile exists, that user is returned. If it is new, a record is created. `/auth/login` and `/auth/register` do the same for users."
       }
     },
     {
@@ -115,7 +102,7 @@
           "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"mark\": 8\n}"
         },
         "url": "{{baseUrl}}/api/app/user/scores",
-        "description": "Save this user's one overall mark for the live participant. Sending again replaces that user's mark.\n\nSend `mark` or `criteria.overall` as a whole number from 1 to `publicMaxMarks`. The admin sets that maximum. Category fields such as technique are rejected for a user.\n\nThe public average is the sum of each user's overall mark divided by how many users marked. This average does not choose the winner.\n\n`200`:\n```json\n{\n  \"ok\": true,\n  \"score\": { \"playerId\": \"...\", \"criteria\": { \"overall\": 8 }, \"total\": 8, \"comment\": \"\", \"maxTotal\": 10 },\n  \"publicAverage\": 8,\n  \"publicCount\": 1,\n  \"player\": { \"resultsPublished\": false, \"player\": {} }\n}\n```"
+        "description": "Save this user's one overall mark. Allowed only when `canVote` is true (admin clicked Voting started). Sending again returns 403: Once you submit, you can't redo the voting.\n\nSend `mark` or `criteria.overall` as a whole number from 1 to `publicMaxMarks`.\n\n`200` includes `alreadyVoted: true` and `voteOnceMessage`."
       }
     },
     {

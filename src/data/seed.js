@@ -1,5 +1,6 @@
 import { hashPassword } from '../utils/passwords.js'
 import { defaultMarkCriteria } from '../services/scoring.service.js'
+import { defaultSitePeople } from '../services/siteContent.service.js'
 import { defaultTaxonomy } from '../services/taxonomy.service.js'
 
 const user = (id, name, email, password, role) => ({
@@ -77,9 +78,10 @@ export function createSeed() {
       score('s11', 'g1', 'j3', 10, 9, 9, 8, 'Crowd favourite.'),
       score('s12', 'g3', 'j1', 7, 8, 8, 9, 'Colourful and fun.'),
     ],
-    settings: { resultsPublished: false, livePlayerId: null },
+    settings: { resultsPublished: false, livePlayerId: null, votingOpen: false, sitePeopleSeeded: true, judgeProfilesSeeded: false },
     sessions: {},
     markCriteria: defaultMarkCriteria(),
     ...defaultTaxonomy(),
+    ...defaultSitePeople(),
   }
 }

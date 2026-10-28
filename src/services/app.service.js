@@ -1,5 +1,5 @@
 import { competingCategories } from './taxonomy.service.js'
-import { criteriaForClassification, maxTotalOf, PASS_PERCENT, publicMaxMarks, scoringMetaFrom, splitScores } from './scoring.service.js'
+import { AUDIENCE_ONCE, criteriaForClassification, maxTotalOf, PASS_PERCENT, publicMaxMarks, scoringMetaFrom, splitScores } from './scoring.service.js'
 import { categoryPrice } from './taxonomy.service.js'
 
 export function scoringMeta(db, classificationId) {
@@ -43,17 +43,36 @@ function lookupName(list, id) {
   return list.find((item) => item.id === id)?.name || null
 }
 
-function liveCard(db, showScore, audience = 'judge') {
-  const player = db.players.find((item) => item.id === db.settings?.livePlayerId)
-  return player ? playerCard(db, player, { showScore, audience }) : null
+function voteState(db, player, voter, audience = 'judge') {
+  const live = db.settings?.livePlayerId === player.id
+  const votingOpen = live && Boolean(db.settings?.votingOpen)
+  const alreadyVoted = Boolean(voter && audience === 'public' && db.scores.some((score) => score.playerId === player.id && score.judgeId === voter.id))
+  return {
+    live,
+    performing: live,
+    votingOpen,
+    alreadyVoted,
+    canVote: audience === 'public' ? votingOpen && !alreadyVoted : votingOpen,
+    voteOnceMessage: alreadyVoted ? AUDIENCE_ONCE : null,
+  }
 }
 
-export function playerCard(db, player, { showScore = false, myScore = null, audience = 'judge' } = {}) {
+function liveCard(db, showScore, audience = 'judge', voter = null) {
+  const player = db.players.find((item) => item.id === db.settings?.livePlayerId)
+  return player ? playerCard(db, player, { showScore, audience, voter }) : null
+}
+
+export function playerCard(db, player, { showScore = false, myScore = null, audience = 'judge', voter = null } = {}) {
   const stats = playerStats(db, player)
+  const vote = voteState(db, player, voter, audience)
   return {
     id: player.id,
     name: player.name,
     chestNo: player.chestNo,
+    registeredId: player.registeredId || null,
+    arrivalNo: player.arrivalNo || null,
+    arrived: Boolean(player.arrived),
+    ...vote,
     type: player.type,
     format: player.formatKey || (player.type === 'group' ? 'group' : player.type === 'couple' ? 'couple' : 'solo'),
     category: player.category,
@@ -105,6 +124,8 @@ export function judgeHome(db, judge, { type = 'single', filter = 'all' } = {}) {
       const score = mine(player.id)
       return playerCard(db, player, {
         showScore: false,
+        audience: 'judge',
+        voter: judge,
         myScore: score
           ? { id: score.id, criteria: score.criteria, total: score.total, comment: score.comment || '', maxTotal: maxTotalOf(criteriaForClassification(db, player.classificationId)) }
           : null,
@@ -117,7 +138,7 @@ export function judgeHome(db, judge, { type = 'single', filter = 'all' } = {}) {
     filter,
     progress: { done, total: ofType.length },
     ...scoringMeta(db),
-    livePlayer: liveCard(db, false),
+    livePlayer: liveCard(db, false, 'judge', judge),
     players,
   }
 }
@@ -127,6 +148,8 @@ export function judgePlayerDetail(db, judge, player) {
   return {
     ...playerCard(db, player, {
       showScore: false,
+      audience: 'judge',
+      voter: judge,
       myScore: score
         ? { id: score.id, criteria: score.criteria, total: score.total, comment: score.comment || '', maxTotal: maxTotalOf(criteriaForClassification(db, player.classificationId)) }
         : null,
@@ -143,6 +166,7 @@ export function userHome(db, user, { type = 'single' } = {}) {
     : ofType
   const winners = published ? db.players.filter((player) => player.winner) : []
   const categories = competingCategories(db.classifications)
+  const mine = (playerId) => db.scores.find((score) => score.playerId === playerId && score.judgeId === user.id) || null
 
   return {
     user: profile(user),
@@ -151,8 +175,8 @@ export function userHome(db, user, { type = 'single' } = {}) {
     ...scoringMeta(db),
     publicMaxMarks: publicMaxMarks(db),
     criteria: [{ id: 'overall', key: 'overall', name: 'Overall', label: 'Overall', maxMarks: publicMaxMarks(db) }],
-    livePlayer: liveCard(db, published, 'public'),
-    winners: winners.map((player) => playerCard(db, player, { showScore: true, audience: 'public' })),
+    livePlayer: liveCard(db, published, 'public', user),
+    winners: winners.map((player) => playerCard(db, player, { showScore: true, audience: 'public', voter: user })),
     podium: published ? db.settings?.podium || null : null,
     winnersByCategory: categories.map((item) => {
       const places = published
@@ -171,15 +195,36 @@ export function userHome(db, user, { type = 'single' } = {}) {
         }),
       }
     }),
-    players: ranked.map((player) => playerCard(db, player, { showScore: published, audience: 'public' })),
+    players: ranked.map((player) => {
+      const score = mine(player.id)
+      return playerCard(db, player, {
+        showScore: published,
+        audience: 'public',
+        voter: user,
+        myScore: score
+          ? { id: score.id, criteria: score.criteria, total: score.total, comment: score.comment || '', maxTotal: publicMaxMarks(db) }
+          : null,
+      })
+    }),
   }
 }
 
-export function userPlayerDetail(db, player) {
+export function userPlayerDetail(db, player, user = null) {
   const published = Boolean(db.settings?.resultsPublished)
+  const score = user
+    ? db.scores.find((item) => item.playerId === player.id && item.judgeId === user.id) || null
+    : null
   return {
     resultsPublished: published,
-    player: playerCard(db, player, { showScore: published, audience: 'public' }),
+    player: playerCard(db, player, {
+      showScore: published,
+      audience: 'public',
+      voter: user,
+      myScore: score
+        ? { id: score.id, criteria: score.criteria, total: score.total, comment: score.comment || '', maxTotal: publicMaxMarks(db) }
+        : null,
+    }),
     publicMaxMarks: publicMaxMarks(db),
+    voteOnceMessage: score ? AUDIENCE_ONCE : null,
   }
 }
