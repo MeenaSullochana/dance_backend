@@ -23,11 +23,30 @@ function presentUser(user, viewer) {
   return view
 }
 
+function presentPlayer(player, viewer) {
+  const staff = viewer && (viewer.role === 'admin' || viewer.role === 'judge')
+  if (staff) return player
+  return {
+    id: player.id,
+    name: player.name,
+    type: player.type,
+    formatKey: player.formatKey || (player.type === 'group' ? 'group' : player.type === 'couple' ? 'couple' : 'solo'),
+    category: player.category,
+    danceStyle: player.danceStyle || player.category,
+    registeredId: player.registeredId || null,
+    arrivalNo: player.arrivalNo || null,
+    chestNo: player.chestNo,
+    photo: player.photo || null,
+    classificationId: player.classificationId || null,
+    winner: Boolean(player.winner),
+  }
+}
+
 export function present(db, viewer) {
   return {
     user: viewer ? presentUser(viewer, viewer) : null,
     users: db.users.map((user) => presentUser(user, viewer)),
-    players: db.players,
+    players: (db.players || []).map((player) => presentPlayer(player, viewer)),
     scores: db.scores,
     settings: db.settings,
     ageBands: db.ageBands || [],
