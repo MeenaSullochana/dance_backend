@@ -38,7 +38,9 @@ export function createImportController(store) {
           const startChest = Math.max(100, ...db.players.map((player) => player.chestNo || 0))
           const players = rowsToPlayers(ready, startChest)
           for (const player of players) {
-            const registered = assignRegisteredId(db, player)
+            const registered = player.classificationId
+              ? assignRegisteredId(db, { ...player, reissue: true })
+              : { registeredId: null }
             db.players.push({
               id: newId(player.type === 'group' ? 'g' : 'p'),
               ...player,

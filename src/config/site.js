@@ -13,6 +13,7 @@ export const backendUrl = trimUrl(
   process.env.BACKEND_URL,
   production ? 'https://backdod.senatespace.in' : 'http://localhost:7000',
 )
+export const renderBackendUrl = trimUrl(process.env.RENDER_BACKEND_URL, 'https://dance-api.onrender.com')
 export const mongoUrl = String(process.env.MONGO_URL || '').trim()
 export const port = Number(process.env.PORT) || Number(new URL(backendUrl).port) || 7000
 export const isProduction = production

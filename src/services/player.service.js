@@ -57,28 +57,33 @@ function nextNumber(values) {
   return (used.length ? Math.max(...used) : 0) + 1
 }
 
+function prefixNumber(value, prefix) {
+  const current = String(value || '').toUpperCase()
+  if (!prefix || !current.startsWith(prefix)) return null
+  const n = Number(current.slice(prefix.length))
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+export function formatRegisteredId(prefix, number) {
+  return `${prefix}${String(number).padStart(2, '0')}`
+}
+
 export function assignRegisteredId(db, player) {
   if (!player.classificationId) return { registeredId: player.registeredId || null }
   const category = (db.classifications || []).find((item) => item.id === player.classificationId)
   const prefix = String(category?.prefix || '').trim().toUpperCase()
   if (player.registeredId && !player.reissue) {
     if (!prefix) return { registeredId: player.registeredId }
-    const current = String(player.registeredId).toUpperCase()
-    if (current.startsWith(prefix) && /^\d+$/.test(current.slice(prefix.length))) {
-      return { registeredId: player.registeredId }
-    }
+    if (prefixNumber(player.registeredId, prefix)) return { registeredId: player.registeredId }
   }
   if (!prefix) {
     return { error: `Set a Registered ID prefix for ${category?.name || 'this category'} in Classifications (e.g. SK, SY, SA)` }
   }
   const used = (db.players || []).map((item) => {
     if (item.id && player.id && item.id === player.id) return null
-    const value = String(item.registeredId || '').toUpperCase()
-    if (!value.startsWith(prefix)) return null
-    const n = Number(value.slice(prefix.length))
-    return Number.isInteger(n) ? n : null
+    return prefixNumber(item.registeredId, prefix)
   })
-  return { registeredId: `${prefix}${nextNumber(used)}` }
+  return { registeredId: formatRegisteredId(prefix, nextNumber(used)) }
 }
 
 export function assignArrival(db, player) {

@@ -93,8 +93,8 @@ export function playerCard(db, player, { showScore = false, myScore = null, audi
         })),
     photo: player.photo || null,
     winner: showScore ? Boolean(player.winner) : false,
-    status: showScore ? stats.status : 'hidden',
-    score: showScore
+    status: audience === 'public' ? 'hidden' : showScore ? stats.status : 'hidden',
+    score: showScore && audience !== 'public'
       ? {
           average: stats.average,
           percent: stats.percent,

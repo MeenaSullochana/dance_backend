@@ -57,13 +57,19 @@ export function createPlayerController(store) {
         db.players = db.players.map((player) => {
           if (player.id !== req.params.id) return player
           found = true
-          const categoryChanged = player.classificationId !== built.player.classificationId
+          const categoryChanged = (player.classificationId || null) !== (built.player.classificationId || null)
           const formatChanged = playerFormatKey(player) !== playerFormatKey(built.player)
           let registeredId = player.registeredId || null
-          if (built.player.classificationId && (categoryChanged || !registeredId)) {
-            registeredId =
-              assignRegisteredId(db, { ...player, ...built.player, registeredId: categoryChanged ? null : registeredId, reissue: categoryChanged }).registeredId ||
-              registeredId
+          if (built.player.classificationId) {
+            if (categoryChanged || !registeredId) {
+              registeredId =
+                assignRegisteredId(db, {
+                  ...player,
+                  ...built.player,
+                  registeredId: categoryChanged ? null : registeredId,
+                  reissue: categoryChanged || !registeredId,
+                }).registeredId || registeredId
+            }
           }
           let arrivalNo = player.arrivalNo || null
           if (player.arrived && formatChanged) {

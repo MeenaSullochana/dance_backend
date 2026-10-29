@@ -42,12 +42,21 @@ function presentPlayer(player, viewer) {
   }
 }
 
+function presentScores(db, viewer) {
+  const scores = db.scores || []
+  if (viewer && (viewer.role === 'admin' || viewer.role === 'judge')) return scores
+  if (viewer && viewer.role === 'user') {
+    return scores.filter((score) => score.judgeId === viewer.id)
+  }
+  return Boolean(db.settings?.resultsPublished) ? scores : []
+}
+
 export function present(db, viewer) {
   return {
     user: viewer ? presentUser(viewer, viewer) : null,
     users: db.users.map((user) => presentUser(user, viewer)),
     players: (db.players || []).map((player) => presentPlayer(player, viewer)),
-    scores: db.scores,
+    scores: presentScores(db, viewer),
     settings: db.settings,
     ageBands: db.ageBands || [],
     participantTypes: db.participantTypes || [],

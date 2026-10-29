@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { assignRegisteredId } from './player.service.js'
 import {
   findAgeBand,
   findClassification,
@@ -27,7 +28,7 @@ const HEADER_ALIASES = {
     'group members',
   ],
   danceStyle: ['dance style / genre', 'dance style / genre 2', 'dance style / genre 3', 'dance style', 'genre'],
-  age: ['age', 'participant age', 'age (years)'],
+  age: ['age', 'participant age', 'age (years)', 'max age', 'oldest age', 'age of oldest'],
   payment: ['payment screenshot', 'payment proof'],
   timestamp: ['timestamp'],
 }
@@ -39,17 +40,37 @@ function headerKey(header) {
 function mapHeaders(headers) {
   const map = {}
   for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
-    const index = headers.findIndex((header) => aliases.includes(headerKey(header)))
-    if (index >= 0) map[field] = index
+    const indexes = headers
+      .map((header, index) => ({ header, index }))
+      .filter((item) => aliases.includes(headerKey(item.header)))
+      .map((item) => item.index)
+    if (indexes.length) map[field] = indexes
   }
   return map
 }
 
 function cell(row, map, field) {
-  const index = map[field]
-  if (index === undefined) return ''
-  const value = row[index]
-  return value === undefined || value === null ? '' : value
+  const indexes = map[field]
+  if (!indexes) return ''
+  for (const index of indexes) {
+    const value = row[index]
+    if (value !== undefined && value !== null && String(value).trim()) return value
+  }
+  return ''
+}
+
+function oldestListedAge(age, members) {
+  const listed = (members || [])
+    .map((member) => (typeof member === 'object' ? parseAge(member.age) : null))
+    .filter((value) => value !== null)
+  if (age !== null) listed.push(age)
+  return listed.length ? Math.max(...listed) : null
+}
+
+function classifyingAge(formatKey, age, members) {
+  if (formatKey === 'group') return null
+  if (formatKey === 'couple') return oldestListedAge(age, members)
+  return age
 }
 
 export function parseGoogleFormWorkbook(buffer) {
@@ -69,6 +90,7 @@ export function previewGoogleFormRows(db, buffer) {
     throw new Error('Could not find Participant Name or Email columns. Upload the Google Form responses Excel/CSV.')
   }
 
+  const previewPlayers = [...(db.players || [])]
   return rows.map((row, index) => {
     const name = String(cell(row, map, 'name') || '').trim()
     const email = String(cell(row, map, 'email') || '').trim()
@@ -83,9 +105,10 @@ export function previewGoogleFormRows(db, buffer) {
     const paymentUrl = String(cell(row, map, 'payment') || '').trim()
     const formatKey = parseFormat(danceCategoryRaw) || (people === 1 ? 'solo' : people === 2 ? 'couple' : people >= 3 ? 'group' : null)
     const participantType = parseParticipantType(participantRaw, db.participantTypes)
-    const ageBand = findAgeBand(db.ageBands, age, formatKey)
+    const categoryAge = classifyingAge(formatKey, age, members)
+    const ageBand = formatKey === 'group' ? null : findAgeBand(db.ageBands, categoryAge, formatKey)
     const classification = findClassification(db, {
-      age,
+      age: categoryAge,
       participantTypeId: participantType?.id,
       formatKey,
     })
@@ -93,8 +116,8 @@ export function previewGoogleFormRows(db, buffer) {
     if (!name) warnings.push('Missing participant name')
     if (!formatKey) warnings.push('Could not detect Solo / Couple / Group')
     if (!participantType) warnings.push('Participant type not matched')
-    if (formatKey && formatKey !== 'group' && age === null) warnings.push('Age missing — add Age column in the form or edit after import')
-    else if (formatKey && formatKey !== 'group' && age !== null && !ageBand) warnings.push(`No ${formatKey} age category covers age ${age}`)
+    if (formatKey && formatKey !== 'group' && categoryAge === null) warnings.push('Age missing — add Age column in the form or edit after import')
+    else if (formatKey && formatKey !== 'group' && categoryAge !== null && !ageBand) warnings.push(`No ${formatKey} age category covers age ${categoryAge}`)
     if (participantType && formatKey && !(participantType.formatKeys || []).includes(formatKey)) {
       warnings.push(`${participantType.name} is not allowed in ${formatKey}`)
     }
@@ -110,13 +133,20 @@ export function previewGoogleFormRows(db, buffer) {
     )
     if (duplicate) warnings.push('Looks like an existing player (will skip on import)')
 
+    let registeredId = null
+    if (classification?.id) {
+      const assigned = assignRegisteredId({ ...db, players: previewPlayers }, { classificationId: classification.id, reissue: true })
+      registeredId = assigned.registeredId || null
+      if (registeredId) previewPlayers.push({ id: `preview-${index}`, registeredId, classificationId: classification.id })
+    }
+
     return {
       row: index + 2,
       name,
       email,
       phone,
       club,
-      age,
+      age: categoryAge ?? age,
       ageBand: ageBand?.name || null,
       participantType: participantType?.name || participantRaw || null,
       participantTypeId: participantType?.id || null,
@@ -128,6 +158,7 @@ export function previewGoogleFormRows(db, buffer) {
       paymentUrl,
       classificationId: classification?.id || null,
       classification: classification?.name || null,
+      registeredId,
       type: formatKeyToPlayerType(formatKey),
       category: classification?.name || danceStyle,
       warnings,
@@ -154,7 +185,10 @@ export function rowsToPlayers(previewRows, startChest) {
         type: row.type,
         category: row.category,
         danceStyle: row.danceStyle,
-        members: row.type === 'single' ? [] : row.members,
+        members:
+          row.type === 'single'
+            ? []
+            : (row.members || []).map((member) => (typeof member === 'string' ? { name: member, age: null } : member)),
         peopleCount: row.people,
         paymentUrl: row.paymentUrl || null,
         photo: null,

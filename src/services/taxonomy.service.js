@@ -287,6 +287,7 @@ export function ensureCategoryRules(db) {
 
   const solo = formatByKey('solo')
   const couple = formatByKey('couple')
+  const group = formatByKey('group')
 
   const ensureCategory = ({ id, name, format, ageBandId = null, participantTypeId = null, parentId = null, price }) => {
     if (!format) return
@@ -367,7 +368,52 @@ export function ensureCategoryRules(db) {
       price: 0,
     })
   }
+  for (const type of (db.participantTypes || []).filter((item) => item.active !== false && (item.formatKeys || []).includes('group'))) {
+    const key = typeKeyOf(type)
+    const topLevel = key === 'rotaractor' || key === 'dpl'
+    ensureCategory({
+      id: `cl-group-${type.id}`,
+      name: String(type.name || '').replace(/\s*\(.*\)\s*$/, '').trim() || type.name,
+      format: group,
+      participantTypeId: type.id,
+      parentId: topLevel ? null : 'cl-group-adults',
+      price: topLevel ? 1500 : 0,
+    })
+  }
+
+  for (const item of db.classifications || []) {
+    if (item.kind !== 'category') continue
+    if (String(item.prefix || '').trim()) continue
+    const next = suggestedPrefix(item, formatKeyOf(item))
+    if (!next) continue
+    item.prefix = next
+    changed = true
+  }
   return changed
+}
+
+function suggestedPrefix(item, formatKey) {
+  const n = normalizeKey(item?.name)
+  if (formatKey === 'solo') {
+    if (n.includes('tiny')) return 'ST'
+    if (n.includes('kid')) return 'SK'
+    if (n.includes('young')) return 'SY'
+    if (n.includes('adult')) return 'SA'
+  }
+  if (formatKey === 'couple') {
+    if (n.includes('junior')) return 'CJ'
+    if (n.includes('senior')) return 'CS'
+  }
+  if (formatKey === 'group') {
+    if (n.includes('rotaract')) return 'GR'
+    if (n.includes('dpl')) return 'GD'
+    if (n.includes('annette')) return 'GE'
+    if (n === 'ann') return 'GN'
+    if (n.includes('mixed')) return 'GM'
+    if (n.includes('rotarian')) return 'GO'
+    if (n.includes('adult')) return 'GA'
+  }
+  return ''
 }
 
 export function normalizeKey(value) {
